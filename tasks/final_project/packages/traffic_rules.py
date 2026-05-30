@@ -1,29 +1,77 @@
 import time
-import random
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from tasks.final_project.packages.behavior_state import BehaviorState
 
 
-STOP_TAGS = {1}
+# ---------------------------------------------------------------------------
+# Tag ID → meaning
+# ---------------------------------------------------------------------------
+STOP_TAGS  = {1}
+YIELD_TAGS = {4}
 
 INTERSECTION_OPTIONS = {
-    2: ["left"],
-    3: ["right"],
-    4: ["straight"],
+    2: "left",
+    3: "right",
 }
 
-TURN_COMMANDS = {
-    "left": (0.02, 0.18, 1.15),
-    "right": (0.18, 0.02, 1.15),
-    "straight": (0.16, 0.16, 0.85),
+TAG_NAMES = {
+    1: "STOP",
+    2: "LEFT_ONLY",
+    3: "RIGHT_ONLY",
+    4: "YIELD",
 }
 
-PEEK_COMMANDS = {
-    "left": (0.02, 0.16, 0.45),
-    "right": (0.16, 0.02, 0.45),
+# ---------------------------------------------------------------------------
+# Motion commands  (left_wheel, right_wheel)
+# ---------------------------------------------------------------------------
+DRIVE_SPEED   = 0.16   # normal straight speed
+CREEP_SPEED   = 0.06   # slow creep while decelerating toward line
+TURN_LEFT     = (0.16, 0.02)
+TURN_RIGHT    = (0.02, 0.16)
+PEEK_L        = (0.16, 0.02)   # rotate left
+PEEK_R        = (0.02, 0.16)   # rotate right
+
+# How long to drive forward past the red line before turning (left/right signs).
+CROSS_LINE_S  = 0.6
+
+# Turn durations.
+TURN_DURATION = {
+    "left":  1.15,
+    "right": 1.15,
+    "straight": 0.85,
 }
+
+# ---------------------------------------------------------------------------
+# Peek parameters
+# ---------------------------------------------------------------------------
+# Sequence: 3 frames LEFT → hold 1s → 6 frames RIGHT → hold 1s → 3 frames LEFT
+PEEK_FRAMES_L1   = 3     # first left rotation
+PEEK_HOLD_1_S    = 1.0   # hold after left
+PEEK_FRAMES_R    = 6     # right rotation
+PEEK_HOLD_2_S    = 1.0   # hold after right
+PEEK_FRAMES_L2   = 3     # re-align left
+
+# ---------------------------------------------------------------------------
+# Misc constants
+# ---------------------------------------------------------------------------
+RED_LINE_COOLDOWN_S        = 20.0
+STOP_SIGN_WAIT_S           = 5.0
+VEHICLE_OBSERVE_WINDOW_S   = 1.0
+APPROACH_THRESHOLD         = 0.03
+INTERSECTION_DECIDE_TIMEOUT_S = 4.0
+
+
+# ---------------------------------------------------------------------------
+# Peek state machine sub-states (stored as strings in peek_phase)
+# ---------------------------------------------------------------------------
+PH_L1    = "L1"      # rotating left, PEEK_FRAMES_L1 frames
+PH_HOLD1 = "HOLD1"   # holding, 1 second
+PH_R     = "R"       # rotating right, PEEK_FRAMES_R frames
+PH_HOLD2 = "HOLD2"   # holding, 1 second
+PH_L2    = "L2"      # re-aligning left, PEEK_FRAMES_L2 frames
+PH_DONE  = "DONE"
 
 
 @dataclass
@@ -38,26 +86,34 @@ class TrafficDecision:
 
 @dataclass
 class TrafficRuleManager:
-    stop_wait_s: float = 1.0
-    sign_cooldown_s: float = 5.0
-
-    state: BehaviorState = BehaviorState.LANE_FOLLOW
+    # ── core state ──────────────────────────────────────────────────────────
+    state:       BehaviorState = BehaviorState.LANE_FOLLOW
     state_until: float = 0.0
-    turn_until: float = 0.0
+    turn_until:  float = 0.0
 
     active_tag_id: Optional[int] = None
-    chosen_turn: Optional[str] = None
+    chosen_turn:   Optional[str] = None
 
-    last_tag_seen_at: Dict[int, float] = field(default_factory=dict)
+    # ── peek sub-state ───────────────────────────────────────────────────────
+    peek_phase:        str   = PH_L1
+    peek_frame_count:  int   = 0
+    peek_hold_until:   float = 0.0
+    peek_vehicles:     list  = field(default_factory=list)  # offsets collected across all peeks
 
-    pending_tag_id: Optional[int] = None
-    pending_tag_area_ratio: float = 0.0
-    pending_tag_seen_at: float = 0.0
+    # ── vehicle observation (after peeks finish) ─────────────────────────────
+    observed_vehicle_offsets: list  = field(default_factory=list)
+    observed_vehicle_until:   float = 0.0
 
-    observed_vehicle_offsets: list = field(default_factory=list)
-    observed_vehicle_until: float = 0.0
+    # ── sign read at red-line approach ───────────────────────────────────────
+    approach_tag_id: Optional[int] = None   # tag seen when red line first detected
 
-    crossroad_active: bool = False
+    # ── crossroad timing ─────────────────────────────────────────────────────
+    last_crossroad_at:         float = 0.0
+    intersection_decide_since: float = 0.0
+
+    # =========================================================================
+    # Main update
+    # =========================================================================
 
     def update(
         self,
@@ -70,293 +126,319 @@ class TrafficRuleManager:
     ) -> TrafficDecision:
         now = time.time()
 
-        # 1. Enter crossroad state when red line is reached.
+        # ── 1. RED LINE seen while lane-following ────────────────────────────
         if red_line_seen and self.state == BehaviorState.LANE_FOLLOW:
-            self.crossroad_active = True
-            self.state = BehaviorState.CROSSROAD_STOP
-            self.state_until = now + self.stop_wait_s
-            print("[CROSSROAD] red line reached -> stop")
-            return TrafficDecision(0.0, 0.0, self.state, "crossroad red line stop")
+            elapsed = now - self.last_crossroad_at
+            if elapsed < RED_LINE_COOLDOWN_S:
+                print(f"[RED_LINE] cooldown active ({elapsed:.1f}s / {RED_LINE_COOLDOWN_S}s)")
+            else:
+                tag_id = self._best_visible_tag(tags)
+                self.approach_tag_id  = tag_id
+                self.last_crossroad_at = now
+                tag_name = TAG_NAMES.get(tag_id, "UNKNOWN") if tag_id else "NO TAG"
+                print(f"[RED_LINE] *** detected *** tag={tag_name} (id={tag_id})")
 
-        # 2. Crossroad stop.
-        if self.state == BehaviorState.CROSSROAD_STOP:
-            if now < self.state_until:
-                return TrafficDecision(0.0, 0.0, self.state, "stopping at red line")
+                if tag_id in STOP_TAGS:
+                    # Full stop immediately at the line.
+                    self.state       = BehaviorState.STOP_WAIT
+                    self.state_until = now + STOP_SIGN_WAIT_S
+                    print(f"[STOP] stopping at red line for {STOP_SIGN_WAIT_S}s")
+                    return TrafficDecision(0.0, 0.0, self.state, "stop sign at red line", tag_id)
 
-            self.state = BehaviorState.CROSSROAD_PEEK_LEFT
-            self.state_until = now + PEEK_COMMANDS["left"][2]
-            print("[CROSSROAD] peek left")
-            return TrafficDecision(
-                PEEK_COMMANDS["left"][0],
-                PEEK_COMMANDS["left"][1],
-                self.state,
-                "peek left",
-            )
+                elif tag_id in YIELD_TAGS:
+                    # Decelerate and stop just before the line, then peek.
+                    self.state       = BehaviorState.YIELD_WAIT
+                    self.state_until = now + 0.8   # creep window — stops at line
+                    print("[YIELD] decelerating to red line")
+                    return TrafficDecision(CREEP_SPEED, CREEP_SPEED,
+                                           self.state, "yield: decelerating", tag_id)
 
-        # 3. Peek left.
-        if self.state == BehaviorState.CROSSROAD_PEEK_LEFT:
-            if now < self.state_until:
-                return TrafficDecision(
-                    PEEK_COMMANDS["left"][0],
-                    PEEK_COMMANDS["left"][1],
-                    self.state,
-                    "peeking left",
-                )
+                elif tag_id in INTERSECTION_OPTIONS:
+                    # Cross the line first, then turn.
+                    self.state       = BehaviorState.INTERSECTION_DECIDE
+                    self.state_until = now + CROSS_LINE_S
+                    self.intersection_decide_since = now
+                    print(f"[TURN] crossing red line before turning ({CROSS_LINE_S}s)")
+                    return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
+                                           self.state, "crossing red line", tag_id)
 
-            self.state = BehaviorState.CROSSROAD_PEEK_RIGHT
-            self.state_until = now + PEEK_COMMANDS["right"][2]
-            print("[CROSSROAD] peek right")
-            return TrafficDecision(
-                PEEK_COMMANDS["right"][0],
-                PEEK_COMMANDS["right"][1],
-                self.state,
-                "peek right",
-            )
+                else:
+                    # Unknown or no tag — just cross and go straight.
+                    self.state       = BehaviorState.INTERSECTION_DECIDE
+                    self.state_until = now + CROSS_LINE_S
+                    self.intersection_decide_since = now
+                    print("[RED_LINE] no known tag — crossing and going straight")
+                    return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
+                                           self.state, "no tag: crossing", tag_id)
 
-        # 4. Peek right.
-        if self.state == BehaviorState.CROSSROAD_PEEK_RIGHT:
-            if now < self.state_until:
-                return TrafficDecision(
-                    PEEK_COMMANDS["right"][0],
-                    PEEK_COMMANDS["right"][1],
-                    self.state,
-                    "peeking right",
-                )
-
-            vehicle_offset = self._vehicle_offset(frame_shape, detections)
-
-            if vehicle_offset is not None:
-                self.observed_vehicle_offsets = [vehicle_offset]
-                self.observed_vehicle_until = now + 0.7
-                self.state = BehaviorState.CROSSROAD_WAIT_VEHICLE
-                print(f"[CROSSROAD] vehicle seen offset={vehicle_offset:.3f}")
-                return TrafficDecision(0.0, 0.0, self.state, "observing vehicle")
-
-            self.state = BehaviorState.INTERSECTION_DECIDE
-            print("[CROSSROAD] no vehicle -> decide from sign")
-
-        # 5. Observe vehicle: if offset decreases, vehicle approaches.
-        if self.state == BehaviorState.CROSSROAD_WAIT_VEHICLE:
-            vehicle_offset = self._vehicle_offset(frame_shape, detections)
-
-            if vehicle_offset is not None:
-                self.observed_vehicle_offsets.append(vehicle_offset)
-
-            if now < self.observed_vehicle_until:
-                return TrafficDecision(0.0, 0.0, self.state, "observing vehicle motion")
-
-            approaching = self._vehicle_is_approaching()
-
-            if approaching:
-                print("[CROSSROAD] vehicle approaching -> wait")
-                self.observed_vehicle_offsets = []
-                self.observed_vehicle_until = now + 0.7
-                return TrafficDecision(0.0, 0.0, self.state, "vehicle approaching, waiting")
-
-            print("[CROSSROAD] vehicle not approaching -> decide")
-            self.state = BehaviorState.INTERSECTION_DECIDE
-
-        # 6. Normal stop sign from AprilTag.
+        # ── 2. STOP_WAIT ─────────────────────────────────────────────────────
         if self.state == BehaviorState.STOP_WAIT:
             if now < self.state_until:
-                return TrafficDecision(0.0, 0.0, self.state, "full stop", self.active_tag_id)
-            self._reset_state()
+                print(f"[STOP_WAIT] {self.state_until - now:.2f}s remaining")
+                return TrafficDecision(0.0, 0.0, self.state, "full stop",
+                                       self.active_tag_id or self.approach_tag_id)
 
-        # 7. Turning.
+            # Stop time over — check for traffic.
+            v = self._vehicle_offset(frame_shape, detections)
+            if v is not None:
+                print(f"[STOP_WAIT] vehicle present (offset={v:.3f}) — holding")
+                return TrafficDecision(0.0, 0.0, self.state, "stop: vehicle present",
+                                       self.active_tag_id or self.approach_tag_id)
+
+            print("[STOP_WAIT] clear — going straight")
+            self._begin_turn("straight", now)
+            return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
+                                   BehaviorState.TURNING, "stop done: straight",
+                                   self.active_tag_id, "straight")
+
+        # ── 3. YIELD_WAIT (decelerate to stop just before red line) ──────────
+        if self.state == BehaviorState.YIELD_WAIT:
+            if now < self.state_until:
+                remaining = self.state_until - now
+                print(f"[YIELD_WAIT] creeping to line, {remaining:.2f}s remaining")
+                return TrafficDecision(CREEP_SPEED, CREEP_SPEED,
+                                       self.state, "yield: creeping",
+                                       self.approach_tag_id)
+
+            # Stopped at line — begin peek sequence.
+            print("[YIELD] stopped at line — starting peek sequence")
+            self._reset_peek()
+            self.state = BehaviorState.CROSSROAD_PEEK_LEFT
+            return self._do_peek(frame_shape, tags, detections, now)
+
+        # ── 4. PEEK sequence (CROSSROAD_PEEK_LEFT used as the peek state) ────
+        if self.state == BehaviorState.CROSSROAD_PEEK_LEFT:
+            return self._do_peek(frame_shape, tags, detections, now)
+
+        # ── 5. CROSSROAD_WAIT_VEHICLE — vehicle seen after peeks ─────────────
+        if self.state == BehaviorState.CROSSROAD_WAIT_VEHICLE:
+            v = self._vehicle_offset(frame_shape, detections)
+            if v is not None:
+                self.observed_vehicle_offsets.append(v)
+                print(f"[VEHICLE_OBSERVE] offset={v:.3f} (n={len(self.observed_vehicle_offsets)})")
+            else:
+                print("[VEHICLE_OBSERVE] no vehicle this frame")
+
+            if now < self.observed_vehicle_until:
+                return TrafficDecision(0.0, 0.0, self.state, "observing vehicle")
+
+            if self._vehicle_is_approaching():
+                print("[VEHICLE] approaching — extending wait")
+                self.observed_vehicle_offsets = []
+                self.observed_vehicle_until   = now + VEHICLE_OBSERVE_WINDOW_S
+                return TrafficDecision(0.0, 0.0, self.state, "vehicle approaching")
+
+            print("[VEHICLE] clear — going straight")
+            self._begin_turn("straight", now)
+            return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
+                                   BehaviorState.TURNING, "vehicle passed: straight")
+
+        # ── 6. INTERSECTION_DECIDE — for left/right: cross line then turn ────
+        if self.state == BehaviorState.INTERSECTION_DECIDE:
+            if now < self.state_until:
+                # Still crossing the line.
+                remaining = self.state_until - now
+                print(f"[CROSSING] crossing red line, {remaining:.2f}s remaining")
+                return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
+                                       self.state, "crossing line")
+
+            # Crossed — now turn based on the tag we read at approach.
+            tag_id   = self.approach_tag_id
+            tag_name = TAG_NAMES.get(tag_id, "UNKNOWN") if tag_id else "NONE"
+            direction = INTERSECTION_OPTIONS.get(tag_id, "straight")
+            print(f"[INTERSECTION] crossed line, tag={tag_name} -> turning {direction}")
+            self._begin_turn(direction, now, tag_id)
+            l, r = (TURN_LEFT if direction == "left" else
+                    TURN_RIGHT if direction == "right" else
+                    (DRIVE_SPEED, DRIVE_SPEED))
+            return TrafficDecision(l, r, BehaviorState.TURNING,
+                                   f"turn {direction}", tag_id, direction)
+
+        # ── 7. TURNING ────────────────────────────────────────────────────────
         if self.state == BehaviorState.TURNING:
             if now < self.turn_until:
-                left, right, _ = TURN_COMMANDS[self.chosen_turn]
-                return TrafficDecision(left, right, self.state, f"turning {self.chosen_turn}", self.active_tag_id, self.chosen_turn)
+                l, r = (TURN_LEFT  if self.chosen_turn == "left"  else
+                        TURN_RIGHT if self.chosen_turn == "right" else
+                        (DRIVE_SPEED, DRIVE_SPEED))
+                print(f"[TURNING] '{self.chosen_turn}' {self.turn_until - now:.2f}s remaining")
+                return TrafficDecision(l, r, self.state,
+                                       f"turning {self.chosen_turn}",
+                                       self.active_tag_id, self.chosen_turn)
 
+            print(f"[TURNING] '{self.chosen_turn}' done -> LANE_FOLLOW")
             self._reset_state()
-            return TrafficDecision(lane_left, lane_right, BehaviorState.LANE_FOLLOW, "finished crossroad")
+            return TrafficDecision(lane_left, lane_right,
+                                   BehaviorState.LANE_FOLLOW, "turn done: lane follow")
 
-        # 8. Read/remember AprilTags.
-        visible_tag = self._remember_visible_close_tag(frame_shape, tags)
+        # ── 8. LANE_FOLLOW — pass through lane servoing, ignore signs ────────
+        return TrafficDecision(lane_left, lane_right,
+                               BehaviorState.LANE_FOLLOW, "lane follow")
 
-        if self.state == BehaviorState.INTERSECTION_DECIDE:
-            tag_id = self._best_current_tag_id(frame_shape, tags)
+    # =========================================================================
+    # Peek sub-state machine
+    # =========================================================================
 
-            if tag_id is None:
-                print("[CROSSROAD] waiting for direction tag")
-                return TrafficDecision(0.0, 0.0, self.state, "waiting for sign")
+    def _reset_peek(self):
+        self.peek_phase       = PH_L1
+        self.peek_frame_count = 0
+        self.peek_hold_until  = 0.0
+        self.peek_vehicles    = []
 
-            return self._execute_tag_action(tag_id, now)
+    def _do_peek(self, frame_shape, tags, detections, now) -> TrafficDecision:
+        """
+        Peek sequence:
+          PH_L1    → 3 frames rotating left
+          PH_HOLD1 → hold 1 second (collect vehicles, log)
+          PH_R     → 6 frames rotating right
+          PH_HOLD2 → hold 1 second (collect vehicles, log)
+          PH_L2    → 3 frames rotating left (re-align)
+          PH_DONE  → evaluate and transition
+        """
+        # Collect vehicle offset every frame regardless of phase.
+        v = self._vehicle_offset(frame_shape, detections)
+        if v is not None:
+            self.peek_vehicles.append(v)
 
-        # Outside crossroad, use previous disappear-trigger behavior.
-        if visible_tag is not None:
-            return TrafficDecision(lane_left, lane_right, BehaviorState.LANE_FOLLOW, "seen tag, waiting disappear")
-
-        disappeared_tag_id = self._consume_disappeared_tag(now)
-
-        if disappeared_tag_id is None:
-            return TrafficDecision(lane_left, lane_right, BehaviorState.LANE_FOLLOW, "lane follow")
-
-        return self._execute_tag_action(disappeared_tag_id, now)
-
-    def _execute_tag_action(self, tag_id: int, now: float) -> TrafficDecision:
-        if now - self.last_tag_seen_at.get(tag_id, 0.0) < self.sign_cooldown_s:
-            return TrafficDecision(0.0, 0.0, BehaviorState.INTERSECTION_DECIDE, "tag cooldown")
-
-        self.last_tag_seen_at[tag_id] = now
-
-        if tag_id in STOP_TAGS:
-            self.state = BehaviorState.STOP_WAIT
-            self.active_tag_id = tag_id
-            self.state_until = now + self.stop_wait_s
-            print("[TRAFFIC] STOP")
-            return TrafficDecision(0.0, 0.0, self.state, "stop tag", tag_id)
-
-        if tag_id in INTERSECTION_OPTIONS:
-            chosen = random.choice(INTERSECTION_OPTIONS[tag_id])
-            left, right, duration = TURN_COMMANDS[chosen]
-
-            self.state = BehaviorState.TURNING
-            self.active_tag_id = tag_id
-            self.chosen_turn = chosen
-            self.turn_until = now + duration
-
-            print(f"[TRAFFIC] TURN {chosen}")
-            return TrafficDecision(left, right, self.state, f"turn {chosen}", tag_id, chosen)
-
-        return TrafficDecision(0.0, 0.0, BehaviorState.INTERSECTION_DECIDE, "unknown tag")
-
-    def _vehicle_offset(self, frame_shape, detections):
-        h, w = frame_shape[:2]
-        best = None
-
-        for bbox, score, cls_id in detections:
-            # class 1 = truck/vehicle. Ignore duck here.
-            if cls_id != 1:
-                continue
-
-            x1, y1, x2, y2 = [float(v) for v in bbox]
-            cx = ((x1 + x2) / 2.0) / w
-            area_ratio = ((x2 - x1) * (y2 - y1)) / max(1, h * w)
-
-            if area_ratio < 0.004:
-                continue
-
-            offset = abs(cx - 0.5)
-
-            if best is None or offset < best:
-                best = offset
-
-        return best
-
-    def _vehicle_is_approaching(self):
-        if len(self.observed_vehicle_offsets) < 2:
-            return False
-
-        first = self.observed_vehicle_offsets[0]
-        last = self.observed_vehicle_offsets[-1]
-
-        print(f"[VEHICLE_OBSERVE] first={first:.3f} last={last:.3f}")
-
-        return last < first - 0.03
-
-    def _best_current_tag_id(self, frame_shape, tags):
-        h, w = frame_shape[:2]
-        image_area = h * w
-
-        best_id = None
-        best_area = 0.0
-
+        # Log tags every frame.
         for tag in tags:
-            tag_id = int(tag.get("id", -1))
-            if tag_id not in STOP_TAGS and tag_id not in INTERSECTION_OPTIONS:
+            tid = int(tag.get("id", -1))
+            print(f"[PEEK/{self.peek_phase}] tag={TAG_NAMES.get(tid, tid)} "
+                  f"area={tag.get('area', 0):.0f}px²")
+        if v is not None:
+            print(f"[PEEK/{self.peek_phase}] vehicle offset={v:.3f}")
+        else:
+            print(f"[PEEK/{self.peek_phase}] no vehicle")
+
+        # ── PH_L1: rotate left for 3 frames ──────────────────────────────────
+        if self.peek_phase == PH_L1:
+            self.peek_frame_count += 1
+            if self.peek_frame_count >= PEEK_FRAMES_L1:
+                self.peek_phase       = PH_HOLD1
+                self.peek_hold_until  = now + PEEK_HOLD_1_S
+                self.peek_frame_count = 0
+                print(f"[PEEK] L1 done -> HOLD1 ({PEEK_HOLD_1_S}s)")
+            return TrafficDecision(PEEK_L[0], PEEK_L[1],
+                                   BehaviorState.CROSSROAD_PEEK_LEFT, "peek left frames")
+
+        # ── PH_HOLD1: hold for 1 second ──────────────────────────────────────
+        if self.peek_phase == PH_HOLD1:
+            if now < self.peek_hold_until:
+                return TrafficDecision(0.0, 0.0,
+                                       BehaviorState.CROSSROAD_PEEK_LEFT, "peek hold 1")
+            self.peek_phase       = PH_R
+            self.peek_frame_count = 0
+            print(f"[PEEK] HOLD1 done -> R ({PEEK_FRAMES_R} frames)")
+            return TrafficDecision(PEEK_R[0], PEEK_R[1],
+                                   BehaviorState.CROSSROAD_PEEK_LEFT, "peek right start")
+
+        # ── PH_R: rotate right for 6 frames ──────────────────────────────────
+        if self.peek_phase == PH_R:
+            self.peek_frame_count += 1
+            if self.peek_frame_count >= PEEK_FRAMES_R:
+                self.peek_phase       = PH_HOLD2
+                self.peek_hold_until  = now + PEEK_HOLD_2_S
+                self.peek_frame_count = 0
+                print(f"[PEEK] R done -> HOLD2 ({PEEK_HOLD_2_S}s)")
+            return TrafficDecision(PEEK_R[0], PEEK_R[1],
+                                   BehaviorState.CROSSROAD_PEEK_LEFT, "peek right frames")
+
+        # ── PH_HOLD2: hold for 1 second ──────────────────────────────────────
+        if self.peek_phase == PH_HOLD2:
+            if now < self.peek_hold_until:
+                return TrafficDecision(0.0, 0.0,
+                                       BehaviorState.CROSSROAD_PEEK_LEFT, "peek hold 2")
+            self.peek_phase       = PH_L2
+            self.peek_frame_count = 0
+            print(f"[PEEK] HOLD2 done -> L2 ({PEEK_FRAMES_L2} frames re-align)")
+            return TrafficDecision(PEEK_L[0], PEEK_L[1],
+                                   BehaviorState.CROSSROAD_PEEK_LEFT, "peek re-align start")
+
+        # ── PH_L2: re-align left for 3 frames ────────────────────────────────
+        if self.peek_phase == PH_L2:
+            self.peek_frame_count += 1
+            if self.peek_frame_count >= PEEK_FRAMES_L2:
+                self.peek_phase = PH_DONE
+                print("[PEEK] L2 done -> DONE")
+            else:
+                return TrafficDecision(PEEK_L[0], PEEK_L[1],
+                                       BehaviorState.CROSSROAD_PEEK_LEFT, "peek re-align")
+
+        # ── PH_DONE: evaluate everything collected across all peeks ──────────
+        print(f"[PEEK] complete — {len(self.peek_vehicles)} vehicle samples collected")
+
+        if self.peek_vehicles:
+            best = min(self.peek_vehicles)
+            print(f"[PEEK] vehicle detected (best offset={best:.3f}) -> WAIT_VEHICLE")
+            self.state                    = BehaviorState.CROSSROAD_WAIT_VEHICLE
+            self.observed_vehicle_offsets = [best]
+            self.observed_vehicle_until   = now + VEHICLE_OBSERVE_WINDOW_S
+            return TrafficDecision(0.0, 0.0, self.state, "vehicle seen: observing")
+
+        print("[PEEK] no vehicle — going straight")
+        self._begin_turn("straight", now)
+        return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
+                               BehaviorState.TURNING, "peeks clear: straight")
+
+    # =========================================================================
+    # Helpers
+    # =========================================================================
+
+    def _best_visible_tag(self, tags) -> Optional[int]:
+        """Largest known tag currently visible. No area threshold."""
+        best_id, best_area = None, 0.0
+        for tag in tags:
+            tid  = int(tag.get("id", -1))
+            area = float(tag.get("area", 0.0))
+            if tid not in STOP_TAGS and tid not in YIELD_TAGS and tid not in INTERSECTION_OPTIONS:
                 continue
-
-            area_ratio = float(tag.get("area", 0.0)) / max(1, image_area)
-
-            if tag_id == 1 and area_ratio < 0.012:
-                continue
-
-            if tag_id in INTERSECTION_OPTIONS and area_ratio < 0.0012:
-                continue
-
-            if area_ratio > best_area:
-                best_area = area_ratio
-                best_id = tag_id
-
+            if area > best_area:
+                best_area, best_id = area, tid
+        if best_id is not None:
+            print(f"[TAG_SCAN] {TAG_NAMES.get(best_id, best_id)} (id={best_id}) "
+                  f"area={best_area:.0f}px²")
         return best_id
 
-    def _remember_visible_close_tag(self, frame_shape, tags):
-        if not tags:
-            return None
-
+    def _vehicle_offset(self, frame_shape, detections) -> Optional[float]:
         h, w = frame_shape[:2]
-        image_area = h * w
-
-        best_tag = None
-        best_area_ratio = 0.0
-
-        for tag in tags:
-            tag_id = int(tag.get("id", -1))
-            if tag_id not in STOP_TAGS and tag_id not in INTERSECTION_OPTIONS:
+        best: Optional[float] = None
+        for bbox, score, cls_id in detections:
+            if cls_id != 1:
                 continue
-
-            area = float(tag.get("area", 0.0))
-            area_ratio = area / max(1, image_area)
-            cx, _ = tag.get("center", (0.0, 0.0))
-            cx_ratio = cx / w
-
-            if not (0.15 <= cx_ratio <= 0.95):
+            x1, y1, x2, y2 = [float(v) for v in bbox]
+            if ((x2 - x1) * (y2 - y1)) / max(1, h * w) < 0.004:
                 continue
+            offset = abs(((x1 + x2) / 2.0) / w - 0.5)
+            if best is None or offset < best:
+                best = offset
+        return best
 
-            if tag_id == 1 and area_ratio < 0.020:
-                continue
+    def _vehicle_is_approaching(self) -> bool:
+        s = self.observed_vehicle_offsets
+        if len(s) < 2:
+            print("[VEHICLE] not enough samples — assuming stationary")
+            return False
+        delta = s[0] - s[-1]
+        result = delta > APPROACH_THRESHOLD
+        print(f"[VEHICLE] first={s[0]:.3f} last={s[-1]:.3f} "
+              f"delta={delta:+.3f} -> approaching={result}")
+        return result
 
-            if tag_id in INTERSECTION_OPTIONS and area_ratio < 0.0015:
-                continue
-
-            if area_ratio > best_area_ratio:
-                best_area_ratio = area_ratio
-                best_tag = tag
-
-        if best_tag is None:
-            return None
-
-        self.pending_tag_id = int(best_tag["id"])
-        self.pending_tag_area_ratio = best_area_ratio
-        self.pending_tag_seen_at = time.time()
-
-        print(f"[TAG_REMEMBERED] id={self.pending_tag_id} area={best_area_ratio:.4f}")
-        return best_tag
-
-    def _consume_disappeared_tag(self, now):
-        if self.pending_tag_id is None:
-            return None
-
-        if now - self.pending_tag_seen_at < 0.15:
-            return None
-
-        tag_id = self.pending_tag_id
-        area_ratio = self.pending_tag_area_ratio
-
-        if tag_id == 1 and area_ratio < 0.028:
-            self._clear_pending_tag()
-            return None
-
-        if tag_id in INTERSECTION_OPTIONS and area_ratio < 0.0020:
-            self._clear_pending_tag()
-            return None
-
-        print(f"[TAG_DISAPPEARED_TRIGGER] id={tag_id}")
-        self._clear_pending_tag()
-        return tag_id
-
-    def _clear_pending_tag(self):
-        self.pending_tag_id = None
-        self.pending_tag_area_ratio = 0.0
-        self.pending_tag_seen_at = 0.0
+    def _begin_turn(self, direction: str, now: float, tag_id: Optional[int] = None):
+        self.state         = BehaviorState.TURNING
+        self.chosen_turn   = direction
+        self.turn_until    = now + TURN_DURATION.get(direction, 0.85)
+        self.active_tag_id = tag_id
 
     def _reset_state(self):
-        self.state = BehaviorState.LANE_FOLLOW
-        self.state_until = 0.0
-        self.turn_until = 0.0
-        self.active_tag_id = None
-        self.chosen_turn = None
-        self.crossroad_active = False
+        print(f"[STATE_RESET] {self.state.value} -> LANE_FOLLOW")
+        self.state                    = BehaviorState.LANE_FOLLOW
+        self.state_until              = 0.0
+        self.turn_until               = 0.0
+        self.active_tag_id            = None
+        self.chosen_turn              = None
+        self.approach_tag_id          = None
         self.observed_vehicle_offsets = []
-        self._clear_pending_tag()
+        self.peek_vehicles            = []
+        self.intersection_decide_since = 0.0
+        self._reset_peek()
+        # last_crossroad_at kept intentionally for cooldown

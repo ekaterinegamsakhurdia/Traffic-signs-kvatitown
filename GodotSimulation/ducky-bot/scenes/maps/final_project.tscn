@@ -188,7 +188,7 @@ texture_filter = 0
 size = Vector2(0.45, 0.45)
 
 [node name="lane_detect" type="Node3D" unique_id=347687036]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, -12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, -11)
 
 [node name="DuckieBot" parent="." unique_id=2139984255 instance=ExtResource("1_jgyyt")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 3.622817, 0.047902994, 3.683652)
@@ -290,13 +290,8 @@ transform = Transform3D(-0.29, 0, -5.0432597e-08, 0, 1.064, 0, 4.378878e-08, 0, 
 mesh = SubResource("ArrayMesh_wrx62")
 skeleton = NodePath("")
 
-[node name="Tile_003" type="MeshInstance3D" parent="." unique_id=1602240016]
-transform = Transform3D(-1.2894859e-08, 0, -0.34, 0, 1.084, 0, 0.295, 0, -1.4861872e-08, 8.537573, 0.007243285, 2.646078)
-mesh = SubResource("ArrayMesh_wrx62")
-skeleton = NodePath("")
-
 [node name="Tile_010" type="MeshInstance3D" parent="." unique_id=1748755686]
-transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 7.938233, 0.01, 2.6500244)
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 7.981429, 0.01, 2.6488562)
 mesh = SubResource("ArrayMesh_mxu6i")
 skeleton = NodePath("")
 
@@ -306,7 +301,7 @@ mesh = SubResource("ArrayMesh_mxu6i")
 skeleton = NodePath("")
 
 [node name="Tile_015" type="MeshInstance3D" parent="." unique_id=1602146813]
-transform = Transform3D(-1.3113417e-08, 0, 0.3, 0, 1.034, 0, -0.3, 0, -1.3113417e-08, 6.1388006, 0.007243285, 2.6424828)
+transform = Transform3D(-1.3987644e-08, 0, 0.32, 0, 1.104, 0, -0.32, 0, -1.3987644e-08, 6.1658206, 0.007243285, 2.6317248)
 mesh = SubResource("ArrayMesh_wrx62")
 skeleton = NodePath("")
 
@@ -327,7 +322,7 @@ material_override = SubResource("StandardMaterial3D_pfu7q")
 mesh = SubResource("QuadMesh_oiqup")
 
 [node name="AprilTag_Forward_4" type="MeshInstance3D" parent="." unique_id=888734876]
-transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 6.567114, 0.1575, 4.0597086)
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 8.335976, 0.1575, 2.344818)
 material_override = SubResource("StandardMaterial3D_mpb6e")
 mesh = SubResource("QuadMesh_67dd2")
 
@@ -348,7 +343,7 @@ mesh = SubResource("ArrayMesh_438dd")
 skeleton = NodePath("")
 
 [node name="AprilTag_Stop_2" type="MeshInstance3D" parent="." unique_id=1767659695]
-transform = Transform3D(-2.1855694e-08, 0, -0.5, 0, 0.5, 0, 0.5, 0, -2.1855694e-08, 7.614101, 0.157, 1.5471678)
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 6.7611275, 0.157, 4.1111655)
 material_override = SubResource("StandardMaterial3D_438dd")
 mesh = SubResource("QuadMesh_mxu6i")
 
@@ -380,4 +375,14 @@ skeleton = NodePath("")
 [node name="Tile_028" type="MeshInstance3D" parent="." unique_id=1780112886]
 transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 7.3303704, 0.01, 1.4306679)
 mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="AprilTag_Forward_5" type="MeshInstance3D" parent="." unique_id=1453487459]
+transform = Transform3D(-3.059797e-08, 0, 0.7, 0, 0.7, 0, -0.7, 0, -3.059797e-08, 4.7011037, 0.1575, 5.6563816)
+material_override = SubResource("StandardMaterial3D_mpb6e")
+mesh = SubResource("QuadMesh_67dd2")
+
+[node name="Tile_005" type="MeshInstance3D" parent="." unique_id=834609478]
+transform = Transform3D(-1.3113417e-08, 0, -0.346, 0, 1.101, 0, 0.3, 0, -1.512414e-08, 8.530071, 0.007243285, 2.6564846)
+mesh = SubResource("ArrayMesh_wrx62")
 skeleton = NodePath("")
