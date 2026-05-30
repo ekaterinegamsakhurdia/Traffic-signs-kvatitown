@@ -1,0 +1,383 @@
+[gd_scene format=3 uid="uid://da6742qobglux"]
+
+[ext_resource type="PackedScene" uid="uid://by8pqr474iaqj" path="res://scenes/robot/duckie_bot.tscn" id="1_jgyyt"]
+[ext_resource type="Script" uid="uid://clcwdvyof1tge" path="res://scripts/TopViewFollow.gd" id="2_55dwb"]
+[ext_resource type="Texture2D" uid="uid://ctpxnl5i08jgn" path="res://textures/leafy_grass_diff_4k.png" id="3_t61w5"]
+[ext_resource type="Texture2D" uid="uid://dmarl4bfd7bia" path="res://textures/leafy_grass_nor_gl_4k.png" id="4_l4nk8"]
+[ext_resource type="PackedScene" uid="uid://b1lggcp0myfk2" path="res://models/lane_follower.glb" id="5_6g20y"]
+[ext_resource type="Texture2D" uid="uid://mhbbvlxfstxd" path="res://textures/KiuPathObj_Final_curve.png" id="5_g4hbx"]
+[ext_resource type="PackedScene" uid="uid://b7ugvo11ae2ss" path="res://scenes/objects/DuckieRagdool.tscn" id="6_fdf05"]
+[ext_resource type="PackedScene" uid="uid://cghelvr8fx5bv" path="res://models/VehicleCorected.glb" id="7_n2l6t"]
+[ext_resource type="Texture2D" uid="uid://cr4sx1hye0hbk" path="res://textures/KiuPathObj_Cross.png" id="9_eguea"]
+[ext_resource type="Texture2D" uid="uid://dp71m1c18vm02" path="res://textures/KiuPathObj_Final_straight_Whiteboarder.png" id="10_lspod"]
+[ext_resource type="Texture2D" uid="uid://5huhpkbqaff1" path="res://textures/apriltags/tag_1.png" id="11_lspod"]
+[ext_resource type="Texture2D" uid="uid://cadci0gx2wsm4" path="res://textures/apriltags/tag_2.png" id="12_wrx62"]
+[ext_resource type="Texture2D" uid="uid://clxrjpj0oqebc" path="res://textures/apriltags/tag_3.png" id="13_438dd"]
+[ext_resource type="Texture2D" uid="uid://cuvsau3ec5lj2" path="res://textures/apriltags/tag_4.png" id="14_mxu6i"]
+
+[sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_lqe0e"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_lqe0e"]
+sky_top_color = Color(0.27745807, 0.6367754, 0.897324, 1)
+sky_horizon_color = Color(0.6430557, 0.81513584, 0.92623365, 1)
+
+[sub_resource type="Sky" id="Sky_h75p3"]
+sky_material = SubResource("ProceduralSkyMaterial_lqe0e")
+process_mode = 2
+
+[sub_resource type="Environment" id="Environment_1cson"]
+background_mode = 2
+sky = SubResource("Sky_h75p3")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_g70oi"]
+albedo_color = Color(0.14695662, 0.23146757, 0.031017188, 1)
+albedo_texture = ExtResource("3_t61w5")
+normal_enabled = true
+normal_texture = ExtResource("4_l4nk8")
+uv1_scale = Vector3(60, 60, 60)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_v2526"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_10b04"]
+resource_name = "Material.001"
+transparency = 4
+cull_mode = 2
+albedo_texture = ExtResource("9_eguea")
+roughness = 0.5
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_lwkvb"]
+_surfaces = [{
+"aabb": AABB(-1, 0, -1, 2, 1e-05, 2),
+"format": 34896613377,
+"index_count": 6,
+"index_data": PackedByteArray(0, 0, 1, 0, 2, 0, 0, 0, 3, 0, 1, 0),
+"name": "Material.001",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray(0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_438dd"]
+resource_name = "KiuPathObj_Plane_001"
+_surfaces = [{
+"aabb": AABB(-1, 0, -1, 2, 1e-05, 2),
+"attribute_data": PackedByteArray(0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0),
+"format": 34896613399,
+"index_count": 6,
+"index_data": PackedByteArray(0, 0, 1, 0, 2, 0, 0, 0, 3, 0, 1, 0),
+"material": SubResource("StandardMaterial3D_10b04"),
+"name": "Material.001",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray(0, 0, 0, 0, 255, 255, 255, 191, 255, 255, 0, 0, 0, 0, 255, 191, 255, 255, 0, 0, 255, 255, 255, 191, 0, 0, 0, 0, 0, 0, 255, 191, 255, 255, 255, 127, 255, 255, 255, 127, 255, 255, 255, 127, 255, 255, 255, 127)
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_lwkvb")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3jk7p"]
+resource_name = "Material.004"
+transparency = 4
+cull_mode = 2
+albedo_texture = ExtResource("10_lspod")
+roughness = 0.5
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_wj1bt"]
+_surfaces = [{
+"aabb": AABB(-1, 0, -1, 2, 1e-05, 2),
+"format": 34896613377,
+"index_count": 6,
+"index_data": PackedByteArray(0, 0, 1, 0, 2, 0, 0, 0, 3, 0, 1, 0),
+"name": "Material.004",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray(0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_mxu6i"]
+resource_name = "KiuPathObj_Plane_004"
+_surfaces = [{
+"aabb": AABB(-1, 0, -1, 2, 1e-05, 2),
+"attribute_data": PackedByteArray(0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0),
+"format": 34896613399,
+"index_count": 6,
+"index_data": PackedByteArray(0, 0, 1, 0, 2, 0, 0, 0, 3, 0, 1, 0),
+"material": SubResource("StandardMaterial3D_3jk7p"),
+"name": "Material.004",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray(0, 0, 0, 0, 255, 255, 255, 191, 255, 255, 0, 0, 0, 0, 255, 191, 255, 255, 0, 0, 255, 255, 255, 191, 0, 0, 0, 0, 0, 0, 255, 191, 255, 255, 255, 127, 255, 255, 255, 127, 255, 255, 255, 127, 255, 255, 255, 127)
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_wj1bt")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x20yb"]
+resource_name = "Material.015"
+transparency = 4
+cull_mode = 2
+albedo_texture = ExtResource("5_g4hbx")
+roughness = 0.5
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_0cjd5"]
+_surfaces = [{
+"aabb": AABB(-1, 0, -1, 2, 1e-05, 2),
+"format": 34896613377,
+"index_count": 6,
+"index_data": PackedByteArray(0, 0, 1, 0, 2, 0, 0, 0, 3, 0, 1, 0),
+"name": "Material.015",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray(0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_wrx62"]
+resource_name = "KiuPathObj_Plane_006"
+_surfaces = [{
+"aabb": AABB(-1, 0, -1, 2, 1e-05, 2),
+"attribute_data": PackedByteArray(0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0),
+"format": 34896613399,
+"index_count": 6,
+"index_data": PackedByteArray(0, 0, 1, 0, 2, 0, 0, 0, 3, 0, 1, 0),
+"material": SubResource("StandardMaterial3D_x20yb"),
+"name": "Material.015",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray(0, 0, 0, 0, 255, 255, 255, 191, 255, 255, 0, 0, 0, 0, 255, 191, 255, 255, 0, 0, 255, 255, 255, 191, 0, 0, 0, 0, 0, 0, 255, 191, 255, 255, 255, 127, 255, 255, 255, 127, 255, 255, 255, 127, 255, 255, 255, 127)
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_0cjd5")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_438dd"]
+cull_mode = 2
+albedo_texture = ExtResource("11_lspod")
+texture_filter = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_mxu6i"]
+size = Vector2(0.45, 0.45)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_js0sn"]
+cull_mode = 2
+albedo_texture = ExtResource("12_wrx62")
+texture_filter = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_pfu7q"]
+size = Vector2(0.45, 0.45)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pfu7q"]
+cull_mode = 2
+albedo_texture = ExtResource("13_438dd")
+texture_filter = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_oiqup"]
+size = Vector2(0.45, 0.45)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mpb6e"]
+cull_mode = 2
+albedo_texture = ExtResource("14_mxu6i")
+texture_filter = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_67dd2"]
+size = Vector2(0.45, 0.45)
+
+[node name="lane_detect" type="Node3D" unique_id=347687036]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, -12)
+
+[node name="DuckieBot" parent="." unique_id=2139984255 instance=ExtResource("1_jgyyt")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 3.622817, 0.047902994, 3.683652)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=447023157]
+transform = Transform3D(1, 0, 0, 0, 0.0074698986, 0.9999721, 0, -0.9999721, 0.0074698986, -1.0819607, 10.15756, 0)
+
+[node name="Terrain" type="Node3D" parent="." unique_id=921395518]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Terrain" unique_id=1849923133]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Terrain/StaticBody3D" unique_id=1654829679]
+shape = SubResource("WorldBoundaryShape3D_lqe0e")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1654275335]
+environment = SubResource("Environment_1cson")
+
+[node name="NavigationObstacle3D" type="NavigationObstacle3D" parent="." unique_id=1002268349]
+
+[node name="TopView" type="Camera3D" parent="." unique_id=707519608]
+transform = Transform3D(1, 0, 0, 0, -0.006562349, 0.9999785, 0, -0.9999785, -0.006562349, 4.1725354, 0.919008, 5.3346515)
+script = ExtResource("2_55dwb")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=582045447]
+transform = Transform3D(10.057154, 0, 0, 0, 10.057154, 0, 0, 0, 10.057154, 4.57, 0.001, -0.916)
+material_override = SubResource("StandardMaterial3D_g70oi")
+mesh = SubResource("PlaneMesh_v2526")
+
+[node name="lanefollower" parent="." unique_id=1136103115 instance=ExtResource("5_6g20y")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1735616, 0.014968276, 5.171497)
+
+[node name="Tile_015" type="MeshInstance3D" parent="lanefollower" unique_id=1691442064]
+transform = Transform3D(-0.0045517995, -0.001858781, -0.32396865, -0.00061001576, 1.0279965, -0.00057763426, 0.32996804, 0.001874828, -0.0044701076, -1.2218847, 0.01, -1.2528424)
+layers = 868864
+sorting_offset = 1.0
+mesh = SubResource("ArrayMesh_438dd")
+skeleton = NodePath("")
+
+[node name="Tile_016" type="MeshInstance3D" parent="lanefollower" unique_id=433884970]
+transform = Transform3D(-1.3375685e-08, 0, -0.3, 0, 0.954, 0, 0.306, 0, -1.3113417e-08, -1.2458024, 0.01, 0.03664303)
+sorting_offset = 1.0
+mesh = SubResource("ArrayMesh_438dd")
+skeleton = NodePath("")
+
+[node name="Tile_017" type="MeshInstance3D" parent="lanefollower" unique_id=1983987991]
+transform = Transform3D(-1.4861872e-08, 0, -0.333, 0, 1.06, 0, 0.34, 0, -1.45558925e-08, 0.035009414, 0.01, -0.6299138)
+sorting_offset = 1.0
+mesh = SubResource("ArrayMesh_438dd")
+skeleton = NodePath("")
+
+[node name="Duckie" parent="." unique_id=410782932 instance=ExtResource("6_fdf05")]
+transform = Transform3D(0.6373164, -0.09001359, -0.765327, 0, 0.9931544, -0.11680941, 0.7706022, 0.074444555, 0.6329536, 4.177288, 0.061, 4.36)
+
+[node name="VehicleCorected" parent="." unique_id=1056507017 instance=ExtResource("7_n2l6t")]
+transform = Transform3D(0.02916032, 0, -0.9995747, 0, 1, 0, 0.9995747, 0, 0.02916032, 6.055675, 0.046961177, 3.521151)
+
+[node name="Duckie2" parent="." unique_id=275832261 instance=ExtResource("6_fdf05")]
+transform = Transform3D(0.6373164, -0.09001359, -0.765327, 0, 0.99315435, -0.11680941, 0.7706022, 0.074444555, 0.6329536, 7.2050023, 0.061383232, 4.422494)
+
+[node name="Duckie3" parent="." unique_id=424191556 instance=ExtResource("6_fdf05")]
+transform = Transform3D(0.6373164, -0.09001359, -0.765327, 0, 0.99315435, -0.11680941, 0.7706022, 0.074444555, 0.6329536, 5.9152446, 0.061383232, 5.6645126)
+
+[node name="VehicleCorected2" parent="." unique_id=138014101 instance=ExtResource("7_n2l6t")]
+transform = Transform3D(-0.63404244, 0, -0.7732984, 0, 1, 0, 0.7732984, 0, -0.63404244, 6.6037526, 0.099114046, 5.0892634)
+
+[node name="VehicleCorected3" parent="." unique_id=420190795 instance=ExtResource("7_n2l6t")]
+transform = Transform3D(-0.8207506, 0, 0.5712868, 0, 1, 0, -0.5712868, 0, -0.8207506, 4.5087976, 0.046961177, 3.558249)
+
+[node name="Duckie4" parent="." unique_id=60841580 instance=ExtResource("6_fdf05")]
+transform = Transform3D(0.6373164, -0.09001359, -0.765327, 0, 0.99315435, -0.11680941, 0.7706022, 0.074444555, 0.6329536, 5.1062074, 0.061383232, 3.025775)
+
+[node name="Tile_004" type="MeshInstance3D" parent="." unique_id=1658743424]
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 6.7113714, 0.01, 4.5278096)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_006" type="MeshInstance3D" parent="." unique_id=876013625]
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 7.3653975, 0.01, 4.52735)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_007" type="MeshInstance3D" parent="." unique_id=520409335]
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 8.022461, 0.01, 4.52735)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_008" type="MeshInstance3D" parent="." unique_id=1646144802]
+transform = Transform3D(0.3, 0, 0, 0, 1.101, 0, 0, 0, 0.345, 8.564688, 0.01, 3.886294)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_009" type="MeshInstance3D" parent="." unique_id=243804754]
+transform = Transform3D(0.3, 0, 0, 0, 1.101, 0, 0, 0, 0.345, 8.566809, 0.005, 3.254148)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_002" type="MeshInstance3D" parent="." unique_id=2091974781]
+transform = Transform3D(-0.29, 0, -5.0432597e-08, 0, 1.064, 0, 4.378878e-08, 0, -0.334, 8.570088, 0.007243285, 4.4994006)
+mesh = SubResource("ArrayMesh_wrx62")
+skeleton = NodePath("")
+
+[node name="Tile_003" type="MeshInstance3D" parent="." unique_id=1602240016]
+transform = Transform3D(-1.2894859e-08, 0, -0.34, 0, 1.084, 0, 0.295, 0, -1.4861872e-08, 8.537573, 0.007243285, 2.646078)
+mesh = SubResource("ArrayMesh_wrx62")
+skeleton = NodePath("")
+
+[node name="Tile_010" type="MeshInstance3D" parent="." unique_id=1748755686]
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 7.938233, 0.01, 2.6500244)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_011" type="MeshInstance3D" parent="." unique_id=338263504]
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 7.327162, 0.01, 2.6538067)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_015" type="MeshInstance3D" parent="." unique_id=1602146813]
+transform = Transform3D(-1.3113417e-08, 0, 0.3, 0, 1.034, 0, -0.3, 0, -1.3113417e-08, 6.1388006, 0.007243285, 2.6424828)
+mesh = SubResource("ArrayMesh_wrx62")
+skeleton = NodePath("")
+
+[node name="AprilTag_Stop_1" type="MeshInstance3D" parent="." unique_id=1498815236]
+transform = Transform3D(-2.1855694e-08, 0, -0.5, 0, 0.5, 0, 0.5, 0, -2.1855694e-08, 9.945438, 0.157, 4.7046595)
+material_override = SubResource("StandardMaterial3D_438dd")
+mesh = SubResource("QuadMesh_mxu6i")
+
+[node name="AprilTag_Left_2" type="MeshInstance3D" parent="." unique_id=1517737498]
+transform = Transform3D(-2.1855692e-08, 0, 0.49999997, 0, 0.5, 0, -0.49999997, 0, -2.1855692e-08, 5.312534, 0.1575, 3.5350351)
+material_override = SubResource("StandardMaterial3D_js0sn")
+mesh = SubResource("QuadMesh_pfu7q")
+
+[node name="AprilTag_Right_3" type="MeshInstance3D" parent="." unique_id=1351323115]
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 6.1995764, 0.1575, 1.1071434)
+visible = false
+material_override = SubResource("StandardMaterial3D_pfu7q")
+mesh = SubResource("QuadMesh_oiqup")
+
+[node name="AprilTag_Forward_4" type="MeshInstance3D" parent="." unique_id=888734876]
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 6.567114, 0.1575, 4.0597086)
+material_override = SubResource("StandardMaterial3D_mpb6e")
+mesh = SubResource("QuadMesh_67dd2")
+
+[node name="Tile_016" type="MeshInstance3D" parent="." unique_id=1600512440]
+transform = Transform3D(0.27, 0, 0, 0, 0.991, 0, 0, 0, 0.311, 4.943777, 0.01, 4.058966)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_017" type="MeshInstance3D" parent="." unique_id=1969687834]
+transform = Transform3D(0.27, 0, 0, 0, 0.991, 0, 0, 0, 0.311, 4.943777, 0.01, 4.640841)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_020" type="MeshInstance3D" parent="." unique_id=1232552750]
+transform = Transform3D(-1.4424758e-08, 0, -0.324, 0, 1.028, 0, 0.33, 0, -1.416249e-08, 6.156618, 0.01, 1.4457827)
+sorting_offset = 1.0
+mesh = SubResource("ArrayMesh_438dd")
+skeleton = NodePath("")
+
+[node name="AprilTag_Stop_2" type="MeshInstance3D" parent="." unique_id=1767659695]
+transform = Transform3D(-2.1855694e-08, 0, -0.5, 0, 0.5, 0, 0.5, 0, -2.1855694e-08, 7.614101, 0.157, 1.5471678)
+material_override = SubResource("StandardMaterial3D_438dd")
+mesh = SubResource("QuadMesh_mxu6i")
+
+[node name="Tile_024" type="MeshInstance3D" parent="." unique_id=1592562930]
+transform = Transform3D(0.218, 0, 0, 0, 0.8, 0, 0, 0, 0.251, 4.93293, 0.01, 5.717041)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_025" type="MeshInstance3D" parent="." unique_id=1855381675]
+transform = Transform3D(0.218, 0, 0, 0, 0.8, 0, 0, 0, 0.251, 4.93293, 0.01, 6.167158)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_026" type="MeshInstance3D" parent="." unique_id=1898293207]
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 6.690749, 0.01, 2.6538067)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_012" type="MeshInstance3D" parent="." unique_id=1119661551]
+transform = Transform3D(0.3, 0, 0, 0, 1.101, 0, 0, 0, 0.345, 6.144036, 0.01, 2.0481777)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_027" type="MeshInstance3D" parent="." unique_id=1367345131]
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 6.690749, 0.01, 1.4306679)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")
+
+[node name="Tile_028" type="MeshInstance3D" parent="." unique_id=1780112886]
+transform = Transform3D(-1.3113417e-08, 0, 0.345, 0, 1.101, 0, -0.3, 0, -1.508043e-08, 7.3303704, 0.01, 1.4306679)
+mesh = SubResource("ArrayMesh_mxu6i")
+skeleton = NodePath("")

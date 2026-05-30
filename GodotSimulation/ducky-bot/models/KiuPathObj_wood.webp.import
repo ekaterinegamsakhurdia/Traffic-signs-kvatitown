@@ -2,20 +2,20 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cl8shouk5ykms"
-path.s3tc="res://.godot/imported/CircularRoad_Final_straight_Whiteboarder.png-327d80996494fb649f33f86a39946073.s3tc.ctex"
+uid="uid://yyphcwmgsnll"
+path.s3tc="res://.godot/imported/KiuPathObj_wood.webp-c1971483f0c0bb4740d5a25cfc1e8ec3.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "f61bc10766c6c57e05ca6b2461fb067c"
+"md5": "dad918ab57b5690dc4ad4452f2f5bb43"
 }
 
 [deps]
 
-source_file="res://textures/CircularRoad_Final_straight_Whiteboarder.png"
-dest_files=["res://.godot/imported/CircularRoad_Final_straight_Whiteboarder.png-327d80996494fb649f33f86a39946073.s3tc.ctex"]
+source_file="res://models/KiuPathObj_wood.webp"
+dest_files=["res://.godot/imported/KiuPathObj_wood.webp-c1971483f0c0bb4740d5a25cfc1e8ec3.s3tc.ctex"]
 
 [params]
 

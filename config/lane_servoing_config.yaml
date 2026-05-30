@@ -1,5 +1,9 @@
-base_speed: 0.13
-curve_speed: 0
-d_gain: 0.0
+base_speed: 0.38
+curve_boost: 1.5
+curve_speed: 0.2
+curve_threshold: 200
+d_gain: 0.32
 detection_threshold: 100
-p_gain: 0.0
+max_steer: 0.35
+p_gain: 0.16
+steering_threshold: 0.2

@@ -2,20 +2,17 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cl8shouk5ykms"
-path.s3tc="res://.godot/imported/CircularRoad_Final_straight_Whiteboarder.png-327d80996494fb649f33f86a39946073.s3tc.ctex"
+uid="uid://cadci0gx2wsm4"
+path.s3tc="res://.godot/imported/tag_2.png-e2a4226a9765394025e84795933de91e.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
-generator_parameters={
-"md5": "f61bc10766c6c57e05ca6b2461fb067c"
-}
 
 [deps]
 
-source_file="res://textures/CircularRoad_Final_straight_Whiteboarder.png"
-dest_files=["res://.godot/imported/CircularRoad_Final_straight_Whiteboarder.png-327d80996494fb649f33f86a39946073.s3tc.ctex"]
+source_file="res://textures/apriltags/tag_2.png"
+dest_files=["res://.godot/imported/tag_2.png-e2a4226a9765394025e84795933de91e.s3tc.ctex"]
 
 [params]
 

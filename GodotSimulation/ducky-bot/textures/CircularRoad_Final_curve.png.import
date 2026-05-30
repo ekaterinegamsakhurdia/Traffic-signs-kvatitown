@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://48coomte3ryv"
-path.s3tc="res://.godot/imported/CircularRoad_Final_curve.png-ac702563c80365a04d3c7b2d2d02a168.s3tc.ctex"
+path.s3tc="res://.godot/imported/CircularRoad_Final_curve.png-5661f5d9a55a6ebbbd4f0bec197e940c.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -14,8 +14,8 @@ generator_parameters={
 
 [deps]
 
-source_file="res://models/CircularRoad_Final_curve.png"
-dest_files=["res://.godot/imported/CircularRoad_Final_curve.png-ac702563c80365a04d3c7b2d2d02a168.s3tc.ctex"]
+source_file="res://textures/CircularRoad_Final_curve.png"
+dest_files=["res://.godot/imported/CircularRoad_Final_curve.png-5661f5d9a55a6ebbbd4f0bec197e940c.s3tc.ctex"]
 
 [params]
 
