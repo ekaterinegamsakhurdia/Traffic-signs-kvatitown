@@ -3,8 +3,6 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from tasks.final_project.packages.behavior_state import BehaviorState
-
-
 # ---------------------------------------------------------------------------
 # Tag ID → meaning
 # ---------------------------------------------------------------------------
@@ -27,7 +25,7 @@ TAG_NAMES = {
 # Motion commands  (left_wheel, right_wheel)
 # ---------------------------------------------------------------------------
 DRIVE_SPEED   = 0.16   # normal straight speed
-CREEP_SPEED   = 0.06   # slow creep while decelerating toward line
+CREEP_SPEED   = 0.03   # slow creep while decelerating toward line
 TURN_LEFT     = (0.16, 0.02)
 TURN_RIGHT    = (0.02, 0.16)
 PEEK_L        = (0.16, 0.02)   # rotate left
@@ -38,9 +36,9 @@ CROSS_LINE_S  = 0.6
 
 # Turn durations.
 TURN_DURATION = {
-    "left":  1.15,
-    "right": 1.15,
-    "straight": 0.85,
+    "left":  2,
+    "right": 2,
+    "straight": 1,
 }
 
 # ---------------------------------------------------------------------------
@@ -51,15 +49,19 @@ PEEK_FRAMES_L1   = 3     # first left rotation
 PEEK_HOLD_1_S    = 1.0   # hold after left
 PEEK_FRAMES_R    = 6     # right rotation
 PEEK_HOLD_2_S    = 1.0   # hold after right
-PEEK_FRAMES_L2   = 3     # re-align left
+PEEK_FRAMES_L2   = 4     # re-align left
 
 # ---------------------------------------------------------------------------
 # Misc constants
 # ---------------------------------------------------------------------------
-RED_LINE_COOLDOWN_S        = 20.0
-STOP_SIGN_WAIT_S           = 5.0
+RED_LINE_COOLDOWN_S        = 10.0
+STOP_SIGN_WAIT_S           = 10.0
 VEHICLE_OBSERVE_WINDOW_S   = 1.0
 APPROACH_THRESHOLD         = 0.03
+# If vehicle offset doesn't change more than this across 5 consecutive frames,
+# treat it as parked and ignore it.
+STATIONARY_FRAME_THRESHOLD = 0.01
+STATIONARY_FRAMES_IGNORE   = 5
 INTERSECTION_DECIDE_TIMEOUT_S = 4.0
 
 
@@ -103,9 +105,11 @@ class TrafficRuleManager:
     # ── vehicle observation (after peeks finish) ─────────────────────────────
     observed_vehicle_offsets: list  = field(default_factory=list)
     observed_vehicle_until:   float = 0.0
+    vehicle_stationary_frames: int  = 0   # counts frames where offset barely changes
 
     # ── sign read at red-line approach ───────────────────────────────────────
     approach_tag_id: Optional[int] = None   # tag seen when red line first detected
+    peek_for_stop:   bool          = False  # True when peek is part of a STOP sign sequence
 
     # ── crossroad timing ─────────────────────────────────────────────────────
     last_crossroad_at:         float = 0.0
@@ -139,16 +143,19 @@ class TrafficRuleManager:
                 print(f"[RED_LINE] *** detected *** tag={tag_name} (id={tag_id})")
 
                 if tag_id in STOP_TAGS:
-                    # Full stop immediately at the line.
-                    self.state       = BehaviorState.STOP_WAIT
-                    self.state_until = now + STOP_SIGN_WAIT_S
-                    print(f"[STOP] stopping at red line for {STOP_SIGN_WAIT_S}s")
-                    return TrafficDecision(0.0, 0.0, self.state, "stop sign at red line", tag_id)
+                    # Decelerate to the line, peek both ways, THEN stop 5 seconds.
+                    self.state       = BehaviorState.YIELD_WAIT
+                    self.state_until = now + 0.8
+                    self.peek_for_stop = True
+                    print("[STOP] decelerating to red line — will peek then stop 5s")
+                    return TrafficDecision(CREEP_SPEED, CREEP_SPEED,
+                                           self.state, "stop: decelerating to line", tag_id)
 
                 elif tag_id in YIELD_TAGS:
                     # Decelerate and stop just before the line, then peek.
                     self.state       = BehaviorState.YIELD_WAIT
-                    self.state_until = now + 0.8   # creep window — stops at line
+                    self.state_until = now + 0.8
+                    self.peek_for_stop = False
                     print("[YIELD] decelerating to red line")
                     return TrafficDecision(CREEP_SPEED, CREEP_SPEED,
                                            self.state, "yield: decelerating", tag_id)
@@ -186,7 +193,13 @@ class TrafficRuleManager:
                                        self.active_tag_id or self.approach_tag_id)
 
             print("[STOP_WAIT] clear — going straight")
-            self._begin_turn("straight", now)
+            # Use a longer forward drive so slow frame rates don't skip it entirely.
+            self.state        = BehaviorState.TURNING
+            self.chosen_turn  = "straight"
+            self.turn_until   = now + 2.0   # 2 seconds forward after stop sign
+            self.active_tag_id = self.approach_tag_id
+            print(f"[STOP_WAIT] entering TURNING straight for 2.0s "
+                  f"turn_until={self.turn_until:.2f} now={now:.2f}")
             return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
                                    BehaviorState.TURNING, "stop done: straight",
                                    self.active_tag_id, "straight")
@@ -213,10 +226,35 @@ class TrafficRuleManager:
         # ── 5. CROSSROAD_WAIT_VEHICLE — vehicle seen after peeks ─────────────
         if self.state == BehaviorState.CROSSROAD_WAIT_VEHICLE:
             v = self._vehicle_offset(frame_shape, detections)
+
             if v is not None:
                 self.observed_vehicle_offsets.append(v)
-                print(f"[VEHICLE_OBSERVE] offset={v:.3f} (n={len(self.observed_vehicle_offsets)})")
+
+                # Check if offset has barely moved across last N frames.
+                if len(self.observed_vehicle_offsets) >= 2:
+                    prev = self.observed_vehicle_offsets[-2]
+                    curr = self.observed_vehicle_offsets[-1]
+                    if abs(curr - prev) < STATIONARY_FRAME_THRESHOLD:
+                        self.vehicle_stationary_frames += 1
+                    else:
+                        self.vehicle_stationary_frames = 0  # reset if it moved
+
+                print(f"[VEHICLE_OBSERVE] offset={v:.3f} "
+                      f"stationary_frames={self.vehicle_stationary_frames} "
+                      f"(n={len(self.observed_vehicle_offsets)})")
+
+                # Vehicle hasn't moved for 5 frames — treat as parked, ignore it.
+                if self.vehicle_stationary_frames >= STATIONARY_FRAMES_IGNORE:
+                    print("[VEHICLE] stationary for "
+                          f"{STATIONARY_FRAMES_IGNORE} frames — ignoring, going straight")
+                    self.state        = BehaviorState.TURNING
+                    self.chosen_turn  = "straight"
+                    self.turn_until   = now + 2.0
+                    self.active_tag_id = self.approach_tag_id
+                    return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
+                                           BehaviorState.TURNING, "parked vehicle: ignored")
             else:
+                self.vehicle_stationary_frames = 0
                 print("[VEHICLE_OBSERVE] no vehicle this frame")
 
             if now < self.observed_vehicle_until:
@@ -224,14 +262,18 @@ class TrafficRuleManager:
 
             if self._vehicle_is_approaching():
                 print("[VEHICLE] approaching — extending wait")
-                self.observed_vehicle_offsets = []
-                self.observed_vehicle_until   = now + VEHICLE_OBSERVE_WINDOW_S
+                self.observed_vehicle_offsets  = []
+                self.vehicle_stationary_frames = 0
+                self.observed_vehicle_until    = now + VEHICLE_OBSERVE_WINDOW_S
                 return TrafficDecision(0.0, 0.0, self.state, "vehicle approaching")
 
-            print("[VEHICLE] clear — going straight")
-            self._begin_turn("straight", now)
+            print("[VEHICLE] not approaching — going straight")
+            self.state        = BehaviorState.TURNING
+            self.chosen_turn  = "straight"
+            self.turn_until   = now + 2.0
+            self.active_tag_id = self.approach_tag_id
             return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
-                                   BehaviorState.TURNING, "vehicle passed: straight")
+                                   BehaviorState.TURNING, "vehicle not approaching: straight")
 
         # ── 6. INTERSECTION_DECIDE — for left/right: cross line then turn ────
         if self.state == BehaviorState.INTERSECTION_DECIDE:
@@ -369,15 +411,28 @@ class TrafficRuleManager:
         if self.peek_vehicles:
             best = min(self.peek_vehicles)
             print(f"[PEEK] vehicle detected (best offset={best:.3f}) -> WAIT_VEHICLE")
-            self.state                    = BehaviorState.CROSSROAD_WAIT_VEHICLE
-            self.observed_vehicle_offsets = [best]
-            self.observed_vehicle_until   = now + VEHICLE_OBSERVE_WINDOW_S
+            self.state                     = BehaviorState.CROSSROAD_WAIT_VEHICLE
+            self.observed_vehicle_offsets  = [best]
+            self.vehicle_stationary_frames = 0
+            self.observed_vehicle_until    = now + VEHICLE_OBSERVE_WINDOW_S
             return TrafficDecision(0.0, 0.0, self.state, "vehicle seen: observing")
 
-        print("[PEEK] no vehicle — going straight")
-        self._begin_turn("straight", now)
+        # No vehicle seen during peeks.
+        if self.peek_for_stop:
+            # STOP sign sequence — now do the 5 second full stop.
+            print(f"[PEEK] no vehicle, STOP sign — stopping for {STOP_SIGN_WAIT_S}s")
+            self.state       = BehaviorState.STOP_WAIT
+            self.state_until = now + STOP_SIGN_WAIT_S
+            return TrafficDecision(0.0, 0.0, BehaviorState.STOP_WAIT,
+                                   "stop sign: full stop after peek")
+
+        print("[PEEK] no vehicle, YIELD — going straight")
+        self.state        = BehaviorState.TURNING
+        self.chosen_turn  = "straight"
+        self.turn_until   = now + 2.0
+        self.active_tag_id = self.approach_tag_id
         return TrafficDecision(DRIVE_SPEED, DRIVE_SPEED,
-                               BehaviorState.TURNING, "peeks clear: straight")
+                               BehaviorState.TURNING, "yield peeks clear: straight")
 
     # =========================================================================
     # Helpers
@@ -431,14 +486,16 @@ class TrafficRuleManager:
 
     def _reset_state(self):
         print(f"[STATE_RESET] {self.state.value} -> LANE_FOLLOW")
-        self.state                    = BehaviorState.LANE_FOLLOW
-        self.state_until              = 0.0
-        self.turn_until               = 0.0
-        self.active_tag_id            = None
-        self.chosen_turn              = None
-        self.approach_tag_id          = None
-        self.observed_vehicle_offsets = []
-        self.peek_vehicles            = []
+        self.state                     = BehaviorState.LANE_FOLLOW
+        self.state_until               = 0.0
+        self.turn_until                = 0.0
+        self.active_tag_id             = None
+        self.chosen_turn               = None
+        self.approach_tag_id           = None
+        self.peek_for_stop             = False
+        self.observed_vehicle_offsets  = []
+        self.vehicle_stationary_frames = 0
+        self.peek_vehicles             = []
         self.intersection_decide_since = 0.0
         self._reset_peek()
         # last_crossroad_at kept intentionally for cooldown
