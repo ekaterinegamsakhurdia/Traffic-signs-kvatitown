@@ -15,8 +15,8 @@ INTERSECTION_OPTIONS = {
 }
 
 TAG_NAMES = {
-    1: "STOP",
-    2: "LEFT_ONLY",
+    25: "STOP",
+    9: "LEFT_ONLY",
     3: "RIGHT_ONLY",
     4: "YIELD",
 }
