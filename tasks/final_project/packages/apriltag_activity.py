@@ -44,10 +44,6 @@ class AprilTagDetector:
         return self._detect_gray(gray, offset_x=0, offset_y=0)
 
     def detect_inside_signs(self, frame_rgb, detections):
-        """
-        YOLO may say "generic sign".
-        This function crops the lower half of that sign and scans for the AprilTag.
-        """
 
         if not self.ready:
             return []
@@ -67,15 +63,16 @@ class AprilTagDetector:
             if h <= 15 or w <= 15:
                 continue
 
-            # Bottom half of the sign contains AprilTag.
-            tag_y1 = y1 + int(h * 0.42)
-            tag_y2 = y2
+
+            # Top half of the sign contains AprilTag.
+            tag_y1 = y1
+            tag_y2 = y1 + int(h * 0.58)
 
             pad = 8
             x1p = max(0, x1 - pad)
             x2p = min(frame_rgb.shape[1], x2 + pad)
-            y1p = max(0, tag_y1 - pad)
-            y2p = min(frame_rgb.shape[0], tag_y2 + pad)
+            y1p = max(0, y1 - pad)
+            y2p = min(frame_rgb.shape[0], y2 + pad)
 
             crop = frame_rgb[y1p:y2p, x1p:x2p]
 

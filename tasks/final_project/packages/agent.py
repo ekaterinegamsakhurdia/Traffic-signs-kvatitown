@@ -5,17 +5,20 @@ import numpy as np
 from tasks.visual_lane_servoing.packages.agent import LaneServoingAgent
 from tasks.final_project.packages.apriltag_activity import AprilTagDetector
 from tasks.final_project.packages.traffic_rules import TrafficRuleManager, TrafficDecision
+from tasks.final_project.packages.object_detector import ObjectThreatDetector
 
 
 class FinalProjectAgent:
     def __init__(self):
-        self.lane_agent  = LaneServoingAgent()
-        self.tag_detector = AprilTagDetector()
-        self.rules        = TrafficRuleManager()
+        self.lane_agent    = LaneServoingAgent()
+        self.tag_detector  = AprilTagDetector()
+        self.rules         = TrafficRuleManager()
+        self.obj_detector  = ObjectThreatDetector()
 
         self.last_tags:           List[dict]           = []
         self.last_decision:       TrafficDecision | None = None
         self.last_red_line_seen:  bool                 = False
+        self.last_threats:        list                 = []
 
     # ------------------------------------------------------------------
     # Red-line detection
@@ -47,14 +50,9 @@ class FinalProjectAgent:
         red_ratio  = red_pixels / max(1, roi_area)
         red_seen   = red_ratio > 0.025
 
-        # Only print when something notable happens to avoid log spam.
         if red_seen:
             print(f"[RED_LINE] *** RED LINE DETECTED *** ratio={red_ratio:.4f} "
                   f"pixels={red_pixels}/{roi_area}")
-        else:
-            # Uncomment the line below for verbose per-frame ratio logging:
-            # print(f"[RED_LINE] not seen ratio={red_ratio:.4f}")
-            pass
 
         return red_seen
 
@@ -68,41 +66,57 @@ class FinalProjectAgent:
         # 1. Lane servoing baseline
         lane_left, lane_right = self.lane_agent.compute_commands(frame_rgb)
 
-        # 2. Perception
+        # 2. Perception — AprilTags
         self.last_tags          = self.tag_detector.detect_combined(frame_rgb, detections)
         self.last_red_line_seen = self._detect_red_line(frame_rgb)
 
-        # Log detections summary (only when something is present)
+        # 3. Threat detection — ducks and vehicles in front of the robot
+        self.last_threats = self.obj_detector.evaluate(frame_rgb.shape, detections)
+
+        # Log perception summary (only when something noteworthy is present).
         if self.last_tags:
-            tag_summary = [(t["id"], f"{t.get('area', 0):.0f}px²", t.get("source", "?"))
-                           for t in self.last_tags]
+            tag_summary = [
+                (t["id"], f"{t.get('area', 0):.0f}px²", t.get("source", "?"))
+                for t in self.last_tags
+            ]
             print(f"[PERCEPTION] AprilTags seen: {tag_summary}")
 
         vehicle_count = sum(1 for _, _, cls_id in detections if cls_id == 1)
         duck_count    = sum(1 for _, _, cls_id in detections if cls_id == 0)
         sign_count    = sum(1 for _, _, cls_id in detections if cls_id == 2)
         if detections:
-            print(f"[PERCEPTION] YOLO detections — vehicles={vehicle_count} "
-                  f"ducks={duck_count} signs={sign_count}")
+            print(
+                f"[PERCEPTION] YOLO detections — "
+                f"vehicles={vehicle_count} ducks={duck_count} signs={sign_count}"
+            )
 
-        # 3. Traffic-rule decision (overrides lane servoing when needed)
+        if self.last_threats:
+            threat_summary = [
+                f"{t.label}@({t.cx_norm:.2f},{t.cy_norm:.2f}) area={t.area_frac:.4f}"
+                for t in self.last_threats
+            ]
+            print(f"[PERCEPTION] Collision threats: {threat_summary}")
+
+        # 4. Traffic-rule decision
         decision = self.rules.update(
-            lane_left=lane_left,
-            lane_right=lane_right,
-            frame_shape=frame_rgb.shape,
-            tags=self.last_tags,
-            detections=detections,
-            red_line_seen=self.last_red_line_seen,
+            lane_left      = lane_left,
+            lane_right     = lane_right,
+            frame_shape    = frame_rgb.shape,
+            tags           = self.last_tags,
+            detections     = detections,
+            red_line_seen  = self.last_red_line_seen,
+            threats        = self.last_threats,
         )
 
         self.last_decision = decision
 
-        # Log the final command issued
-        print(f"[DECISION] state={decision.state.value} "
-              f"L={decision.left:.3f} R={decision.right:.3f} "
-              f"reason='{decision.reason}'"
-              + (f" tag={decision.active_tag_id}" if decision.active_tag_id is not None else "")
-              + (f" turn={decision.chosen_turn}"  if decision.chosen_turn  is not None else ""))
+        print(
+            # f"[DECISION] state={decision.state.value} "
+            f"L={decision.left:.3f} R={decision.right:.3f} "
+            f"reason='{decision.reason}'"
+            + (f" tag={decision.active_tag_id}" if decision.active_tag_id is not None else "")
+            + (f" turn={decision.chosen_turn}"  if decision.chosen_turn  is not None else "")
+        )
 
         return decision.left, decision.right
 
@@ -117,6 +131,10 @@ class FinalProjectAgent:
         info["apriltag_backend"] = self.tag_detector.backend
         info["tags"]             = self.last_tags
         info["red_line_seen"]    = self.last_red_line_seen
+        info["threats"]          = [
+            {"label": t.label, "side": t.side, "area": t.area_frac}
+            for t in self.last_threats
+        ]
 
         if self.last_decision:
             info["behavior_state"]  = self.last_decision.state.value

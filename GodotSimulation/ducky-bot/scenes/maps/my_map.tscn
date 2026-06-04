@@ -6,13 +6,13 @@
 [ext_resource type="PackedScene" path="res://scenes/tiles/tile_cross.tscn" id="4_qry34"]
 [ext_resource type="PackedScene" uid="uid://b7ugvo11ae2ss" path="res://scenes/objects/DuckieRagdool.tscn" id="5_ayfeo"]
 [ext_resource type="PackedScene" uid="uid://mo3nfx0lk1h3" path="res://scenes/objects/obj_stop_sign.tscn" id="6_r2m4g"]
+[ext_resource type="Texture2D" uid="uid://b3wgvj5kwquk4" path="res://textures/tag36h11/tag36_11_00001.png" id="7_nkdeu"]
 [ext_resource type="PackedScene" uid="uid://bm6eeklw3fh22" path="res://scenes/objects/obj_parking_sign.tscn" id="8_dkk6w"]
 [ext_resource type="PackedScene" uid="uid://by8pqr474iaqj" path="res://scenes/robot/duckie_bot.tscn" id="9_aq75q"]
 [ext_resource type="Script" uid="uid://frrhxfeqwt4d" path="res://scripts/path_follow_3d.gd" id="11_fhj88"]
 [ext_resource type="Texture2D" uid="uid://5huhpkbqaff1" path="res://textures/apriltags/tag_1.png" id="12_iwlnh"]
 [ext_resource type="PackedScene" uid="uid://dsxbif155ikun" path="res://scenes/robot/duckie_bot_npc.tscn" id="12_rpith"]
 [ext_resource type="Texture2D" uid="uid://cuvsau3ec5lj2" path="res://textures/apriltags/tag_4.png" id="13_eipjs"]
-[ext_resource type="Texture2D" uid="uid://cadci0gx2wsm4" path="res://textures/apriltags/tag_2.png" id="13_qdxqs"]
 
 [sub_resource type="Curve3D" id="Curve3D_jp5uc"]
 _data = {
@@ -48,16 +48,7 @@ texture_filter = 0
 [sub_resource type="QuadMesh" id="QuadMesh_8gl0n"]
 size = Vector2(0.45, 0.45)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8gl0n"]
-cull_mode = 2
-albedo_texture = ExtResource("13_qdxqs")
-texture_filter = 0
-
-[sub_resource type="QuadMesh" id="QuadMesh_svypl"]
-size = Vector2(0.45, 0.45)
-
 [node name="my_map" type="Node3D" unique_id=84948560]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 1)
 
 [node name="Tiles" type="Node3D" parent="." unique_id=1328038589]
 
@@ -296,6 +287,10 @@ transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 7.5,
 
 [node name="Signs" type="Node3D" parent="." unique_id=577722851]
 
+[node name="Sign_2_11" parent="Signs" unique_id=1575506644 instance=ExtResource("6_r2m4g")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0.091, 6.6)
+sign_texture = ExtResource("7_nkdeu")
+
 [node name="Sign_10_11" parent="Signs" unique_id=1971301317 instance=ExtResource("6_r2m4g")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.091, 6.6)
 
@@ -306,7 +301,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.091, 4.2)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0.091, 0.6)
 
 [node name="DuckieBot" parent="." unique_id=865415826 instance=ExtResource("9_aq75q")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.3417177, 0.155, 1.8135927)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.16800001, 0.155, 3.9)
 
 [node name="TopView" type="Camera3D" parent="DuckieBot" unique_id=1167855173]
 transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0, 1, 0.8)
@@ -343,26 +338,16 @@ material_override = SubResource("StandardMaterial3D_q03au")
 mesh = SubResource("PlaneMesh_a0o1y")
 
 [node name="AprilTag_Stop_2" type="MeshInstance3D" parent="." unique_id=1104205951]
-transform = Transform3D(-0.5, 0, -4.371139e-08, 0, 0.5, 0, 4.371139e-08, 0, -0.5, 1.0911984, 0.2035, 2.3873715)
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 1.0911984, 0.2035, 2.3873715)
 material_override = SubResource("StandardMaterial3D_eipjs")
 mesh = SubResource("QuadMesh_qdxqs")
 
 [node name="AprilTag_Stop_3" type="MeshInstance3D" parent="." unique_id=890440618]
-transform = Transform3D(-2.1855694e-08, 0, -0.5, 0, 0.5, 0, 0.5, 0, -2.1855694e-08, 1.2000606, 0.2035, 6.6243067)
+transform = Transform3D(-2.1855694e-08, 0, 0.5, 0, 0.5, 0, -0.5, 0, -2.1855694e-08, 1.2000606, 0.2035, 6.6243067)
 material_override = SubResource("StandardMaterial3D_eipjs")
 mesh = SubResource("QuadMesh_qdxqs")
 
 [node name="AprilTag_Forward_5" type="MeshInstance3D" parent="." unique_id=1703463263]
-transform = Transform3D(-3.059797e-08, 0, -0.7, 0, 0.7, 0, 0.7, 0, -3.059797e-08, 2.975, 0.239, 4.3700404)
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 6.0817876, 0.1575, 6.6986504)
 material_override = SubResource("StandardMaterial3D_qdxqs")
 mesh = SubResource("QuadMesh_8gl0n")
-
-[node name="AprilTag_Left_2" type="MeshInstance3D" parent="." unique_id=1306430745]
-transform = Transform3D(-2.1855692e-08, 0, 0.49999997, 0, 0.5, 0, -0.49999997, 0, -2.1855692e-08, 5.401283, 0.2, 4.32)
-material_override = SubResource("StandardMaterial3D_8gl0n")
-mesh = SubResource("QuadMesh_svypl")
-
-[node name="AprilTag_Left_3" type="MeshInstance3D" parent="." unique_id=803502502]
-transform = Transform3D(-2.1855692e-08, 0, 0.49999997, 0, 0.5, 0, -0.49999997, 0, -2.1855692e-08, 8.528, 0.2, 4.32)
-material_override = SubResource("StandardMaterial3D_8gl0n")
-mesh = SubResource("QuadMesh_svypl")
