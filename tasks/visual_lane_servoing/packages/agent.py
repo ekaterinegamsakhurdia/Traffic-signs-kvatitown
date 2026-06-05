@@ -185,6 +185,8 @@ class LaneServoingAgent:
         wheels_driver.set_wheels_speed(left, right)
         return left, right
 
+
+
     def get_debug_info(self, image: np.ndarray) -> dict:
         return self.last_debug_info
 

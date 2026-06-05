@@ -18,6 +18,7 @@ GODOT_SCENES = {
     'modcon': 'res://scenes/maps/Modconpath.tscn',
     'navigator': 'res://scenes/maps/map_follower.tscn',
     'object_detection': 'res://scenes/maps/lane_detect.tscn',
+    'final_project': 'res://scenes/maps/final_project.tscn',
 }
 
 DEFAULT_WEB_PORT = 5000
