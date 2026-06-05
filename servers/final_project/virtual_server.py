@@ -50,7 +50,7 @@ _current_scene = 'final_project'
 # Only send every Nth frame to the object detector.
 # Camera runs at ~30 fps; N=3 gives ~10 fps detection which is plenty
 # for a slow-moving robot and keeps CPU/GPU load low.
-DETECTION_EVERY_N_FRAMES = 3
+DETECTION_EVERY_N_FRAMES = 2
 _det_frame_counter = 0
 
 

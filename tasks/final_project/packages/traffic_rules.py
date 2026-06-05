@@ -39,11 +39,11 @@ DRIVE_SPEED = 0.3
 CREEP_SPEED = 0.05   # slow for yield
 
 # Negative inner wheel gives a tighter ~in-place pivot for 90° turns
-TURN_RIGHT  = (0.20, -0.05)
-TURN_LEFT = (-0.05, 0.20)
+TURN_RIGHT  = (0.25, -0.10)
+TURN_LEFT = (-0.10, 0.25)
 
-PEEK_L = (0.02, 0.2)
-PEEK_R = (0.2, 0.02)
+PEEK_L = (0.02, 0.14)
+PEEK_R = (0.14, 0.02)
 
 
 # ---------------------------------------------------------------------------
@@ -57,23 +57,23 @@ CROSS_LINE_S = 0.3
 # Left needs more: robot is in the right lane and must reach the intersection
 # centre before swinging left. Right needs fewer: already near the right side.
 PRE_TURN_FRAMES = {
-    "left":     32,  # tune me
-    "right":    8,   # tune me
+    "left":     22,  # tune me
+    "right":    12,   # tune me
     "straight": 0,
 }
 
 # Seconds to rotate for a 90° turn.
 # Measure full-rotation time on your surface and divide by 4.
 TURN_DURATION = {
-    "left":     0.25,   # tune me
-    "right":    0.25,   # tune me
+    "left":     0.26,   # tune me
+    "right":    0.26,   # tune me
     "straight": 1.0,
 }
 
 # Frames to drive straight AFTER rotating before handing back to lane follow.
 POST_TURN_FRAMES = {
-    "left":     12,   # tune me
-    "right":    12,    # tune me
+    "left":     17,   # tune me
+    "right":    17,    # tune me
     "straight": 5,
 }
 
