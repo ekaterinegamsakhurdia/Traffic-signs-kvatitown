@@ -39,8 +39,8 @@ DRIVE_SPEED = 0.3
 CREEP_SPEED = 0.05   # slow for yield
 
 # Negative inner wheel gives a tighter ~in-place pivot for 90° turns
-TURN_RIGHT  = (0.25, -0.10)
-TURN_LEFT = (-0.10, 0.25)
+TURN_RIGHT  = (0.3, -0.12)
+TURN_LEFT = (-0.12, 0.3)
 
 PEEK_L = (0.02, 0.14)
 PEEK_R = (0.14, 0.02)
@@ -57,7 +57,7 @@ CROSS_LINE_S = 0.3
 # Left needs more: robot is in the right lane and must reach the intersection
 # centre before swinging left. Right needs fewer: already near the right side.
 PRE_TURN_FRAMES = {
-    "left":     22,  # tune me
+    "left":     25,  # tune me
     "right":    12,   # tune me
     "straight": 0,
 }
@@ -72,8 +72,8 @@ TURN_DURATION = {
 
 # Frames to drive straight AFTER rotating before handing back to lane follow.
 POST_TURN_FRAMES = {
-    "left":     17,   # tune me
-    "right":    17,    # tune me
+    "left":     10,   # tune me
+    "right":    10,    # tune me
     "straight": 5,
 }
 
@@ -98,21 +98,21 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
 # ---------------------------------------------------------------------------
 # Peek parameters — 3 frames each side
 # ---------------------------------------------------------------------------
-PEEK_FRAMES_L1 = 3    # frames rotating left
+PEEK_FRAMES_L1 = 5    # frames rotating left
 PEEK_HOLD_1_S  = 2.0  # hold & scan LEFT
-PEEK_FRAMES_R  = 6    # frames rotating right
+PEEK_FRAMES_R  = 10    # frames rotating right
 PEEK_HOLD_2_S  = 2.0  # hold & scan RIGHT
-PEEK_FRAMES_L2 = 3    # re-align frames back to centre
+PEEK_FRAMES_L2 = 7    # re-align frames back to centre
                        # NOTE: L1=3 left, R=6 right, L2=3 left → net 0 rotation ✓
 
 
 # ---------------------------------------------------------------------------
 # Misc timing constants
 # ---------------------------------------------------------------------------
-RED_LINE_COOLDOWN_S        = 10.0
-STOP_SIGN_WAIT_S           = 5.0
-YIELD_CREEP_S              = 1.5   # seconds to creep through yield
-VEHICLE_OBSERVE_WINDOW_S   = 1.2
+RED_LINE_COOLDOWN_S        = 13.0
+STOP_SIGN_WAIT_S           = 4.0
+YIELD_CREEP_S              = 4   # seconds to creep through yield
+VEHICLE_OBSERVE_WINDOW_S   = 2
 APPROACH_THRESHOLD         = 0.03
 STATIONARY_FRAME_THRESHOLD = 0.01
 STATIONARY_FRAMES_IGNORE   = 5

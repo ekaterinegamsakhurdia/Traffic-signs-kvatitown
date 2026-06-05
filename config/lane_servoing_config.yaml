@@ -7,3 +7,4 @@ detection_threshold: 100
 max_steer: 0.35
 p_gain: 0.16
 steering_threshold: 0.2
+trim: 0.05
