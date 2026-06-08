@@ -39,8 +39,8 @@ DRIVE_SPEED = 0.3
 CREEP_SPEED = 0.05   # slow for yield
 
 # Negative inner wheel gives a tighter ~in-place pivot for 90° turns
-TURN_RIGHT  = (0.3, -0.12)
-TURN_LEFT = (-0.12, 0.3)
+TURN_RIGHT  = (0.3, -0.15)
+TURN_LEFT = (-0.15, 0.3)
 
 PEEK_L = (0.02, 0.14)
 PEEK_R = (0.14, 0.02)
@@ -62,36 +62,29 @@ PRE_TURN_FRAMES = {
     "straight": 0,
 }
 
-# Seconds to rotate for a 90° turn.
-# Measure full-rotation time on your surface and divide by 4.
 TURN_DURATION = {
-    "left":     0.26,   # tune me
-    "right":    0.26,   # tune me
+    "left":     0.27,   # tune me
+    "right":    0.27,   # tune me
     "straight": 1.0,
 }
 
 # Frames to drive straight AFTER rotating before handing back to lane follow.
 POST_TURN_FRAMES = {
-    "left":     10,   # tune me
-    "right":    10,    # tune me
-    "straight": 5,
+    "left":     15, 
+    "right":    15,    
+    "straight": 10,
 }
 
 
 # ---------------------------------------------------------------------------
 # Obstacle-stop parameters
 # ---------------------------------------------------------------------------
-OBSTACLE_CLEAR_FRAMES = 4   # consecutive clear frames before resuming
+OBSTACLE_CLEAR_FRAMES = 4 
 
-# States where a detected threat will interrupt motion.
-# Peek states are excluded: the robot is deliberately scanning sideways so
-# any forward threat should be ignored there.
-# CROSSROAD_TURNING is excluded: aborting a half-completed turn leaves the
-# robot stranded at a bad angle; it's safer to finish the turn.
 OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
     BehaviorState.LANE_FOLLOW,
-    BehaviorState.CROSSROAD_PRE_TURN,   # brief forward phase before rotating
-    BehaviorState.YIELD_WAIT,           # robot is creeping forward
+    BehaviorState.CROSSROAD_PRE_TURN,   
+    BehaviorState.YIELD_WAIT,           
 })
 
 
@@ -99,9 +92,9 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
 # Peek parameters — 3 frames each side
 # ---------------------------------------------------------------------------
 PEEK_FRAMES_L1 = 5    # frames rotating left
-PEEK_HOLD_1_S  = 2.0  # hold & scan LEFT
+PEEK_HOLD_1_S  = 1.0  # hold & scan LEFT
 PEEK_FRAMES_R  = 10    # frames rotating right
-PEEK_HOLD_2_S  = 2.0  # hold & scan RIGHT
+PEEK_HOLD_2_S  = 1.0  # hold & scan RIGHT
 PEEK_FRAMES_L2 = 7    # re-align frames back to centre
                        # NOTE: L1=3 left, R=6 right, L2=3 left → net 0 rotation ✓
 
@@ -111,17 +104,13 @@ PEEK_FRAMES_L2 = 7    # re-align frames back to centre
 # ---------------------------------------------------------------------------
 RED_LINE_COOLDOWN_S        = 13.0
 STOP_SIGN_WAIT_S           = 4.0
-YIELD_CREEP_S              = 4   # seconds to creep through yield
+YIELD_CREEP_S              = 4
 VEHICLE_OBSERVE_WINDOW_S   = 2
 APPROACH_THRESHOLD         = 0.03
 STATIONARY_FRAME_THRESHOLD = 0.01
 STATIONARY_FRAMES_IGNORE   = 5
-CROSSROAD_STOP_S           = 1.0   # brief pause at red line before peek
+CROSSROAD_STOP_S           = 1.0   
 
-# Area threshold for vehicle detection during peek / observation.
-# Intentionally slightly lower than the frontal-threat threshold (0.012) so
-# that partially-visible side-approaching vehicles are caught.
-# A vertical gate (cy_norm >= 0.25) separately filters out horizon-level noise.
 PEEK_MIN_AREA_FRACTION = 0.008
 
 
