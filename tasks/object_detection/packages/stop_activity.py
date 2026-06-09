@@ -6,43 +6,41 @@ class_names = {0: 'duckie', 1: 'truck', 2: 'sign'}
 
 
 def should_stop(detections: List[Detection], img_size: int) -> Tuple[bool, str]:
+<<<<<<< HEAD
+    """Return (True, reason) to stop the bot, (False, '') to keep moving."""
+    stop_y = img_size * 0.55
+    for (x1, y1, x2, y2), score, cls_id in detections:
+        if y2 > stop_y:
+            return True, class_names.get(cls_id, str(cls_id)) + ' detected close ahead'
+    return False, ''
+=======
     """Return True when a duckie/truck is close enough to stop for.
 
-    This is used by the standalone object_detection task server.
-    The final_project task has its own stopping logic inside
-    TrafficRuleManager / ObjectThreatDetector and does NOT call this function.
+    This is used by the object_detection task. The final_project task has
+    similar logic inside TrafficRuleManager, but keeping this implemented
+    prevents TODO crashes if the original object detection server is used.
     """
     if not detections:
         return False, ''
 
+    image_area = max(1, img_size * img_size)
     for bbox, score, cls_id in detections:
-        # Stop for duckies and trucks only.
+        # Stop for duckies and trucks. Do not stop just because a sign is visible.
         if cls_id not in (0, 1):
             continue
 
         x1, y1, x2, y2 = bbox
         w = max(0, x2 - x1)
         h = max(0, y2 - y1)
+        area_ratio = (w * h) / image_area
+        cx = (x1 + x2) / 2
 
-        # BUG FIX: bbox coordinates are in original frame pixel space (e.g. 0–640),
-        # not in model/img_size space.  The old code compared cx against
-        # img_size * 0.1/0.9 (= 41–374 for img_size=416), so any duck in the
-        # right ~37% of a 640-wide frame was incorrectly rejected as off-centre.
-        # Use normalised cx_norm instead so the check is frame-size independent.
-        frame_w = x2 if x2 > img_size else img_size   # best-effort frame width
-        cx_norm = ((x1 + x2) / 2.0) / frame_w
-
-        # Accept ducks anywhere in the central 80% of the frame width.
-        centered = 0.10 <= cx_norm <= 0.90
-
-        # Area is normalised against img_size² (model input area) as before —
-        # detections are already scaled back to original pixels, so recalculate
-        # against an approximate frame area using bbox aspect ratio.
-        area_ratio = (w * h) / max(1, img_size * img_size)
-        close_enough = area_ratio >= 0.02
+        centered = img_size * 0.15 <= cx <= img_size * 0.85
+        close_enough = area_ratio >= 0.035
 
         if centered and close_enough:
             name = class_names.get(cls_id, str(cls_id))
             return True, f'{name} close: score={score:.2f}, area={area_ratio:.3f}'
 
     return False, ''
+>>>>>>> 1846942d7e1aadf41d780927dedd4c5723459929

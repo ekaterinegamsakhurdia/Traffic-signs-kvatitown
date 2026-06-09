@@ -1,9 +1,9 @@
-base_speed: 0.25
+base_speed: 0.41
 curve_boost: 1.0
 curve_speed: 0.1
 curve_threshold: 350
-d_gain: 0.11   #heading gain
+d_gain: 0.11
 detection_threshold: 80
 max_steer: 0.22
-p_gain: 0.18    #lateral gain  franky - 0.18, 0.24 gladius (needs diff right checkpath frames)
+p_gain: 0.24
 steering_threshold: 0.2
