@@ -1,14 +1,16 @@
-
 from typing import List, Optional, Tuple
 
-# Minimum fraction of frame area the bbox must occupy to be considered close.
-MIN_AREA_FRACTION   = 0.012   # ~1.2 % of frame
+# Minimum fraction of frame area the bbox must occupy to be considered a threat.
+MIN_AREA_FRACTION = 0.0005
 
-# Horizontal corridor: ±30% from centre = 20%–80% of frame width.
-FRONTAL_CORRIDOR_HW = 0.30
+# Horizontal corridor: ±44% from centre = 6%–94% of frame width.
+# Raised from 0.30 → 0.44 so ducks at the white edge line (~cx 0.85–0.90)
+# and yellow centre line (~cx 0.20–0.30) are both inside the corridor.
+FRONTAL_CORRIDOR_HW = 0.9
 
 # Objects above this y-fraction are too far away (near horizon).
-FRONTAL_LOWER_GATE  = 0.35   # must be in lower 65% of frame
+# Lowered from 0.35 → 0.28 to react earlier during the approach.
+FRONTAL_LOWER_GATE = 0.1
 
 CLASS_NAMES = {0: "DUCK", 1: "VEHICLE", 2: "SIGN"}
 
@@ -112,8 +114,8 @@ class ObjectThreatDetector:
 
             # ── all gates passed → threat ────────────────────────────────────
             side = (
-                "left"   if cx_norm < 0.42 else
-                "right"  if cx_norm > 0.58 else
+                "left"   if cx_norm < 0.1 else
+                "right"  if cx_norm > 0.9 else
                 "centre"
             )
 

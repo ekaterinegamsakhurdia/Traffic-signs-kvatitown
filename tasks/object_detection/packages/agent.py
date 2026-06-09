@@ -44,7 +44,12 @@ class ObjectDetectionAgent:
             cfg = {}
 
         self.img_size       = cfg.get('img_size',       416)
-        self.conf_threshold = cfg.get('conf_threshold', 0.5)
+        # Default lowered from 0.5 → 0.35 to match integration_activity.filter_by_scores.
+        # With 0.5, a duck near the lane boundary (typically scores 0.35–0.48)
+        # was dropped here before ObjectThreatDetector ever saw it.
+        # ObjectThreatDetector's geometric filters (corridor, area, vertical gate)
+        # handle the real false-positive rejection downstream.
+        self.conf_threshold = cfg.get('conf_threshold', 0.35)
         self.nms_threshold  = cfg.get('nms_threshold',  0.45)
 
         self.model_path       = self._resolve_model_path(student.MODEL_PATH)

@@ -297,13 +297,6 @@ transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 6.6,
 [node name="Sign_1_10" parent="Signs" unique_id=882736530 instance=ExtResource("8_tw3f0")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.6, 0.091, 6)
 
-[node name="DuckieBot" parent="." unique_id=865415826 instance=ExtResource("9_5xmy2")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.832, 0.155, 6.3)
-
-[node name="TopView" type="Camera3D" parent="DuckieBot" unique_id=1887255741]
-transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0, 1, 0.8)
-current = true
-
 [node name="NPCPath" type="Path3D" parent="." unique_id=119113309]
 curve = SubResource("Curve3D_xdp4q")
 
@@ -333,3 +326,10 @@ shape = SubResource("BoxShape3D_k563b")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0.084, 4.8)
 material_override = SubResource("StandardMaterial3D_31o5q")
 mesh = SubResource("PlaneMesh_y7vrc")
+
+[node name="DuckieBot" parent="." unique_id=865415826 instance=ExtResource("9_5xmy2")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.377662, 0.155, 3.0289512)
+
+[node name="TopView" type="Camera3D" parent="DuckieBot" unique_id=1624240734]
+transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0, 1, 0.8)
+current = true
