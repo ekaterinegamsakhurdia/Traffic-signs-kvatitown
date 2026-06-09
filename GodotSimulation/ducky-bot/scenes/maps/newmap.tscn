@@ -1,0 +1,119 @@
+[gd_scene format=3 uid="uid://cf1avcsvr2qrs"]
+
+[ext_resource type="PackedScene" path="res://scenes/tiles/tile_cross.tscn" id="1_b5sps"]
+[ext_resource type="PackedScene" path="res://scenes/tiles/tile_straight.tscn" id="2_8kuxj"]
+[ext_resource type="PackedScene" uid="uid://bm6eeklw3fh22" path="res://scenes/objects/obj_parking_sign.tscn" id="3_k0bit"]
+[ext_resource type="Texture2D" uid="uid://g6uqvm8qyqx" path="res://textures/tag36h11/tag36_11_00039.png" id="4_8hgys"]
+[ext_resource type="Script" uid="uid://frrhxfeqwt4d" path="res://scripts/path_follow_3d.gd" id="5_ahyd0"]
+[ext_resource type="PackedScene" uid="uid://dsxbif155ikun" path="res://scenes/robot/duckie_bot_npc.tscn" id="6_msjr5"]
+[ext_resource type="PackedScene" uid="uid://by8pqr474iaqj" path="res://scenes/robot/duckie_bot.tscn" id="7_60y75"]
+
+[sub_resource type="Curve3D" id="Curve3D_b5sps"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 5.7, 0.091, 3.7680001, 0, 0, 0, 0, 0, 0, 2.1, 0.091, 3.7680001),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8kuxj"]
+size = Vector3(28.8, 0.1, 28.8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k0bit"]
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(0.14, 0.22, 0.1, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_0t7ph"]
+size = Vector2(28.8, 28.8)
+
+[node name="newmap" type="Node3D" unique_id=858564835]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, -4)
+
+[node name="Tiles" type="Node3D" parent="." unique_id=33816911]
+
+[node name="Tile_6_6" parent="Tiles" unique_id=479725648 instance=ExtResource("1_b5sps")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9, 0.091, 3.9)
+
+[node name="Tile_6_5" parent="Tiles" unique_id=1123137846 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9, 0.091, 3.3)
+
+[node name="Tile_6_4" parent="Tiles" unique_id=1561397261 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9, 0.091, 2.7)
+
+[node name="Tile_6_3" parent="Tiles" unique_id=456003331 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9, 0.091, 2.1)
+
+[node name="Tile_6_7" parent="Tiles" unique_id=433553431 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9, 0.091, 4.5)
+
+[node name="Tile_6_8" parent="Tiles" unique_id=1909619934 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9, 0.091, 5.1)
+
+[node name="Tile_6_9" parent="Tiles" unique_id=666973205 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9, 0.091, 5.7)
+
+[node name="Tile_6_10" parent="Tiles" unique_id=499422709 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.9, 0.091, 6.3)
+
+[node name="Tile_5_6" parent="Tiles" unique_id=2026200538 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3.3, 0.091, 3.9)
+
+[node name="Tile_4_6" parent="Tiles" unique_id=1604943841 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.7, 0.091, 3.9)
+
+[node name="Tile_3_6" parent="Tiles" unique_id=673596652 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.1, 0.091, 3.9)
+
+[node name="Tile_8_6" parent="Tiles" unique_id=1479178493 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 5.1, 0.091, 3.9)
+
+[node name="Tile_7_6" parent="Tiles" unique_id=1975358030 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 4.5, 0.091, 3.9)
+
+[node name="Tile_9_6" parent="Tiles" unique_id=1558552682 instance=ExtResource("2_8kuxj")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 5.7, 0.091, 3.9)
+
+[node name="Ducks" type="Node3D" parent="." unique_id=1376372027]
+
+[node name="Signs" type="Node3D" parent="." unique_id=29671683]
+
+[node name="Sign_5_6" parent="Signs" unique_id=882736530 instance=ExtResource("3_k0bit")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 3.5705352, 0.091, 3.6)
+sign_texture = ExtResource("4_8hgys")
+
+[node name="NPCPath" type="Path3D" parent="." unique_id=277110102]
+curve = SubResource("Curve3D_b5sps")
+
+[node name="PathFollower" type="PathFollow3D" parent="NPCPath" unique_id=1109170654]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 5.7, 0.091, 3.7680001)
+script = ExtResource("5_ahyd0")
+
+[node name="DuckieBot_NPC" parent="NPCPath/PathFollower" unique_id=865415826 instance=ExtResource("6_msjr5")]
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=664348406]
+transform = Transform3D(0.8660254, -0.4829629, 0.12940954, 0, 0.25881907, 0.9659258, -0.5, -0.83651626, 0.22414389, 4.8, 20, 4.8)
+light_energy = 1.6
+shadow_enabled = true
+
+[node name="FillLight" type="DirectionalLight3D" parent="." unique_id=1018291291]
+transform = Transform3D(-0.8660254, 0.24999999, -0.43301266, 0, 0.8660254, 0.5, 0.49999997, 0.4330127, -0.75, 4.8, 20, 4.8)
+light_color = Color(0.85, 0.92, 1, 1)
+light_energy = 0.35
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1643142266]
+
+[node name="@CollisionShape3D@135" type="CollisionShape3D" parent="Ground" unique_id=974223843]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0.041, 4.8)
+shape = SubResource("BoxShape3D_8kuxj")
+
+[node name="GroundMesh" type="MeshInstance3D" parent="." unique_id=52340173]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8, 0.084, 4.8)
+material_override = SubResource("StandardMaterial3D_k0bit")
+mesh = SubResource("PlaneMesh_0t7ph")
+
+[node name="DuckieBot" parent="." unique_id=261781881 instance=ExtResource("7_60y75")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 3.7830615, 0.113732256, 2.5790606)
+
+[node name="TopView" type="Camera3D" parent="DuckieBot" unique_id=508134498]
+transform = Transform3D(1, 0, 0, 0, 0.34202015, 0.9396926, 0, -0.9396926, 0.34202015, 0, 1, 0.8)
+current = true

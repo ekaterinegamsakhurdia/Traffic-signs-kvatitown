@@ -1,25 +1,10 @@
 import cv2
 import numpy as np
 
-
-# ---------------------------------------------------------------------------
-# Raw AprilTag 36h11 decoder — requires only base OpenCV (no contrib/aruco).
-# Used as a fallback when cv2.aruco and pupil_apriltags are both unavailable.
-# ---------------------------------------------------------------------------
-
 # How many consecutive frames a tag must be seen before it is reported.
 TAG_CONFIRM_FRAMES = 2
 
-# 36-bit canonical codes (k=0 rotation) for every tag ID used by this project.
-# Generated with:
-#   d = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
-#   img = cv2.aruco.generateImageMarker(d, tag_id, 80)
-#   _, bw = cv2.threshold(img, 0, 1, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-#   row_centres = np.arange(8) * 10 + 5
-#   col_centres = np.arange(8) * 10 + 5
-#   bits = bw[np.ix_(row_centres, col_centres)]
-#   inner = bits[1:7, 1:7]
-#   code = int(inner.ravel().dot(1 << np.arange(35, -1, -1, dtype=np.int64)))
+
 _CODES_36H11 = {
     0x4e20b5a64: 9,
     0x61d897f2c: 10,
