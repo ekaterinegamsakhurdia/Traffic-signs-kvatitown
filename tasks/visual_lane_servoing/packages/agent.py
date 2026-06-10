@@ -73,15 +73,24 @@ class LaneServoingAgent:
         except Exception:
             cfg = {}
 
-        self.p_gain = cfg.get("p_gain", 0.14)
-        self.d_gain = cfg.get("d_gain", 0.05)
+        self.p_gain = cfg.get("p_gain", 0.24)
+        self.d_gain = cfg.get("d_gain", 0.11)
         self.max_steer = cfg.get("max_steer", 0.22)
-        self.base_speed = cfg.get("base_speed", 0.12)
-        self.curve_speed = cfg.get("curve_speed", 0.10)
+        self.base_speed = cfg.get("base_speed", 0.41)
+        self.curve_speed = cfg.get("curve_speed", 0.01)
         self.curve_threshold = cfg.get("curve_threshold", 350)
         self.steering_threshold = cfg.get("steering_threshold", 0.2)
         self.curve_boost = cfg.get("curve_boost", 1.0)
         self.detection_threshold = cfg.get("detection_threshold", 80)
+# base_speed: 0.41
+# curve_boost: 1.0
+# curve_speed: 0.1
+# curve_threshold: 350
+# d_gain: 0.11
+# detection_threshold: 80
+# max_steer: 0.22
+# p_gain: 0.24
+# steering_threshold: 0.2
 
         self.frame_count = 0
 

@@ -30,21 +30,21 @@ TAG_NAMES = {
 DRIVE_SPEED = 0.4
 CREEP_SPEED = 0.05   # slow for yield
 
-TURN_RIGHT  = (0.3, -0.2)
-TURN_LEFT = (-0.2, 0.3)
+TURN_RIGHT  = (0.9, -0.2)
+TURN_LEFT = (-0.2, 0.9)
 
-PEEK_L = (0.02, 0.14)
-PEEK_R = (0.14, 0.02)
+PEEK_L = (-0.02, 0.9)
+PEEK_R = (0.9, -0.02)
 
 # ---------------------------------------------------------------------------
 # Intersection timing / frame tuning
 # ---------------------------------------------------------------------------
 
-CROSS_LINE_S = 0.1   # seconds to drive straight after red line to clear it
+CROSS_LINE_S = 10   # seconds to drive straight after red line to clear it
 
 PRE_TURN_FRAMES = {
-    "left":     26,  # tune me
-    "right":    17,   # tune me
+    "left":     36,  # tune me
+    "right":    27,   # tune me
     "straight": 0,
 }
 
@@ -61,10 +61,7 @@ POST_TURN_FRAMES = {
     "straight": 8,
 }
 
-# ---------------------------------------------------------------------------
-# Obstacle-stop parameters
-# ---------------------------------------------------------------------------
-OBSTACLE_CLEAR_FRAMES = 8   # raised 4 → 8: real camera needs more frames to confirm clear
+OBSTACLE_CLEAR_FRAMES = 8 
 
 OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
     BehaviorState.LANE_FOLLOW,
@@ -79,9 +76,6 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
 })
 
 
-# ---------------------------------------------------------------------------
-# Peek parameters
-# ---------------------------------------------------------------------------
 PEEK_FRAMES_L1 = 4    # frames rotating left
 PEEK_HOLD_1_S  = 1.0  # hold & scan LEFT
 PEEK_FRAMES_R  = 5    # frames rotating right
