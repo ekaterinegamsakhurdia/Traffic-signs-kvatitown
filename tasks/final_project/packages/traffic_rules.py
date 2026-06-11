@@ -30,38 +30,41 @@ TAG_NAMES = {
 DRIVE_SPEED = 0.4
 CREEP_SPEED = 0.05   # slow for yield
 
-TURN_RIGHT  = (0.9, -0.2)
-TURN_LEFT = (-0.2, 0.9)
+TURN_RIGHT  = (0.32, 0.02)
+TURN_LEFT = (0.02, 0.32)
 
-PEEK_L = (-0.02, 0.9)
-PEEK_R = (0.9, -0.02)
+PEEK_L = (0.02, 0.14)
+PEEK_R = (0.14, 0.02)
 
 # ---------------------------------------------------------------------------
 # Intersection timing / frame tuning
 # ---------------------------------------------------------------------------
 
-CROSS_LINE_S = 10   # seconds to drive straight after red line to clear it
+CROSS_LINE_S = 0.05   # seconds to drive straight after red line to clear it
 
 PRE_TURN_FRAMES = {
-    "left":     36,  # tune me
-    "right":    27,   # tune me
+    "left":     10,  # tune me
+    "right":    7,   # tune me
     "straight": 0,
 }
 
 TURN_DURATION = {
-    "left":     0.26,   # tune me
-    "right":    0.26,   # tune me
+    "left":     0.35,   # tune me
+    "right":    0.35,   # tune me
     "straight": 1.0,
 }
 
 # Frames to drive straight AFTER rotating before handing back to lane follow.
 POST_TURN_FRAMES = {
-    "left":     8, 
-    "right":    8,    
+    "left":     14, 
+    "right":    14,    
     "straight": 8,
 }
 
-OBSTACLE_CLEAR_FRAMES = 8 
+# ---------------------------------------------------------------------------
+# Obstacle-stop parameters
+# ---------------------------------------------------------------------------
+OBSTACLE_CLEAR_FRAMES = 8   # raised 4 → 8: real camera needs more frames to confirm clear
 
 OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
     BehaviorState.LANE_FOLLOW,
@@ -76,11 +79,14 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
 })
 
 
+# ---------------------------------------------------------------------------
+# Peek parameters
+# ---------------------------------------------------------------------------
 PEEK_FRAMES_L1 = 4    # frames rotating left
 PEEK_HOLD_1_S  = 1.0  # hold & scan LEFT
-PEEK_FRAMES_R  = 5    # frames rotating right
+PEEK_FRAMES_R  = 8    # frames rotating right
 PEEK_HOLD_2_S  = 1.0  # hold & scan RIGHT
-PEEK_FRAMES_L2 = 3.5    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
+PEEK_FRAMES_L2 = 4.5    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
 
 
 # ---------------------------------------------------------------------------
@@ -97,10 +103,10 @@ VEHICLE_CLEAR_FRAMES_CONFIRM = 6      # raised 3 → 6: require more frames befo
 # ---------------------------------------------------------------------------
 # Misc timing constants
 # ---------------------------------------------------------------------------
-RED_LINE_COOLDOWN_S  = 7.0
-STOP_SIGN_WAIT_S     = 2.5
-YIELD_CREEP_S        = 5
-CROSSROAD_STOP_S     = 1.0
+RED_LINE_COOLDOWN_S  = 7
+STOP_SIGN_WAIT_S     = 3
+YIELD_CREEP_S        = 3
+CROSSROAD_STOP_S     = 0.5
 
 # Area threshold for vehicle detection during peek / observation.
 # Slightly lower than the frontal-threat threshold (0.012) so partially-visible
@@ -183,6 +189,13 @@ class TrafficRuleManager:
 
     # ── crossroad cooldown ────────────────────────────────────────────────────
     last_crossroad_at: float = 0.0
+
+    # ── approach-tag memory ───────────────────────────────────────────────────
+    # Accumulated during every LANE_FOLLOW frame so the robot remembers which
+    # sign it was approaching even after the sign passes out of camera view
+    # before the red line fires.  Reset after each crossroad sequence.
+    _last_lane_tag_id:   Optional[int] = field(default=None, init=False, repr=False)
+    _last_lane_tag_area: float         = field(default=0.0,  init=False, repr=False)
 
     # =========================================================================
     # Main update — called every frame
@@ -332,12 +345,32 @@ class TrafficRuleManager:
         if red_line_seen and self.state == BehaviorState.LANE_FOLLOW:
             elapsed = now - self.last_crossroad_at
             if elapsed < RED_LINE_COOLDOWN_S:
+                # Cooldown: suppress the crossroad trigger but still update which
+                # tag we're approaching so it's ready when the cooldown expires.
+                for t in tags:
+                    tid  = int(t.get("id", -1))
+                    area = float(t.get("area", 0.0))
+                    if tid in ALL_KNOWN_TAGS and area > self._last_lane_tag_area:
+                        self._last_lane_tag_id   = tid
+                        self._last_lane_tag_area = area
                 print(
                     f"[RED_LINE] cooldown active "
                     f"({elapsed:.1f}s / {RED_LINE_COOLDOWN_S}s) — ignoring"
                 )
             else:
-                tag_id   = self._best_visible_tag(tags)
+                # Prefer a live tag in frame; fall back to the last tag seen
+                # while lane-following (it may have passed out of view already).
+                tag_id = self._best_visible_tag(tags)
+                if tag_id is None and self._last_lane_tag_id is not None:
+                    tag_id = self._last_lane_tag_id
+                    print(
+                        f"[RED_LINE] tag not in frame — using approach memory: "
+                        f"{TAG_NAMES.get(tag_id, tag_id)} (id={tag_id})"
+                    )
+                # Clear approach memory regardless — it belongs to this intersection.
+                self._last_lane_tag_id   = None
+                self._last_lane_tag_area = 0.0
+
                 tag_name = TAG_NAMES.get(tag_id, "UNKNOWN") if tag_id else "NO TAG"
                 print(
                     f"[RED_LINE] *** CROSSROAD DETECTED *** "
@@ -541,6 +574,14 @@ class TrafficRuleManager:
                                    BehaviorState.LANE_FOLLOW, "turn done: lane follow")
 
         # ── LANE_FOLLOW fallthrough ────────────────────────────────────────────
+        # Accumulate the best visible known tag so it's still remembered when
+        # the sign passes out of frame before the red line fires.
+        for t in tags:
+            tid  = int(t.get("id", -1))
+            area = float(t.get("area", 0.0))
+            if tid in ALL_KNOWN_TAGS and area > self._last_lane_tag_area:
+                self._last_lane_tag_id   = tid
+                self._last_lane_tag_area = area
         return TrafficDecision(lane_left, lane_right,
                                BehaviorState.LANE_FOLLOW, "lane follow")
 
@@ -881,4 +922,6 @@ class TrafficRuleManager:
         self.resume_state          = None
         self.yield_to_left_until   = 0.0
         self.vehicle_clear_frames  = 0
+        self._last_lane_tag_id   = None
+        self._last_lane_tag_area = 0.0
         self._reset_peek()

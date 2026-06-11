@@ -3,6 +3,9 @@ import numpy as np
 
 # How many consecutive frames a tag must be seen before it is reported.
 TAG_CONFIRM_FRAMES = 2
+# After a confirmed tag disappears, keep it alive for this many extra frames.
+# Prevents single-frame detection gaps from wiping a tag the robot was tracking.
+TAG_GRACE_FRAMES   = 6
 
 
 _CODES_36H11 = {
@@ -119,7 +122,9 @@ class AprilTagDetector:
 
         # Temporal confirmation buffer: tag_id → consecutive-seen-frame count.
         # A tag must be seen for TAG_CONFIRM_FRAMES frames before being reported.
-        self._tag_buffer: dict = {}
+        self._tag_buffer:    dict = {}  # tid → consecutive frames seen (confirmation)
+        self._tag_grace:     dict = {}  # tid → grace frames remaining after disappearing
+        self._tag_last_data: dict = {}  # tid → last known tag dict (used in grace period)
 
         # ── Backend 1: opencv-contrib aruco (fast, simulation-friendly) ──────
         try:
@@ -232,22 +237,44 @@ class AprilTagDetector:
             if tid not in unique or t["area"] > unique[tid]["area"]:
                 unique[tid] = t
 
-        # ── Temporal confirmation ──────────────────────────────────────────
-        # Remove tags from buffer that are no longer visible this frame.
+        # ── Temporal confirmation + grace period ──────────────────────────────
+        # Tags must be confirmed (seen for TAG_CONFIRM_FRAMES consecutive frames)
+        # before being reported.  Once confirmed, they survive TAG_GRACE_FRAMES
+        # additional frames after the last sighting — prevents a single missed
+        # detection frame from wiping a tag the robot is actively tracking.
         current_ids = set(unique.keys())
+
+        # Update every tag currently tracked in the buffer.
         for tid in list(self._tag_buffer.keys()):
-            if tid not in current_ids:
-                del self._tag_buffer[tid]
+            if tid in current_ids:
+                # Tag seen this frame: increment confirmation counter and refresh grace.
+                self._tag_buffer[tid]    += 1
+                self._tag_grace[tid]      = TAG_GRACE_FRAMES
+                self._tag_last_data[tid]  = unique[tid]
+            else:
+                # Tag not seen: decay the grace counter.
+                self._tag_grace[tid] = self._tag_grace.get(tid, 0) - 1
+                if self._tag_grace[tid] <= 0:
+                    # Grace exhausted — evict entirely.
+                    del self._tag_buffer[tid]
+                    self._tag_grace.pop(tid, None)
+                    self._tag_last_data.pop(tid, None)
 
-        # Increment counter for every currently visible tag.
+        # Register any newly seen tags not yet in the buffer.
         for tid in current_ids:
-            self._tag_buffer[tid] = self._tag_buffer.get(tid, 0) + 1
+            if tid not in self._tag_buffer:
+                self._tag_buffer[tid]    = 1
+                self._tag_grace[tid]     = TAG_GRACE_FRAMES
+                self._tag_last_data[tid] = unique[tid]
 
-        # Only return tags that have been seen for TAG_CONFIRM_FRAMES frames.
-        confirmed = [
-            tag for tid, tag in unique.items()
-            if self._tag_buffer.get(tid, 0) >= TAG_CONFIRM_FRAMES
-        ]
+        # Return confirmed tags.  During the grace period the live data is gone
+        # from `unique`, so fall back to the last-known snapshot.
+        confirmed = []
+        for tid, count in self._tag_buffer.items():
+            if count >= TAG_CONFIRM_FRAMES:
+                tag_data = unique.get(tid) or self._tag_last_data.get(tid)
+                if tag_data is not None:
+                    confirmed.append(tag_data)
 
         return confirmed
 
