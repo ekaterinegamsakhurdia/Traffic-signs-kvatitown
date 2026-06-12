@@ -40,25 +40,26 @@ PEEK_R = (0.9, -0.02)
 # Intersection timing / frame tuning
 # ---------------------------------------------------------------------------
 
-CROSS_LINE_S = 10   # seconds to drive straight after red line to clear it
+CROSS_LINE_S = 0.7  # seconds to drive straight after red line to clear it
 
 PRE_TURN_FRAMES = {
-    "left":     36,  # tune me
-    "right":    27,   # tune me
+    "left":     2,  # tune me
+    "right":    2,   # tune me
     "straight": 0,
 }
 
+
 TURN_DURATION = {
-    "left":     0.26,   # tune me
-    "right":    0.26,   # tune me
+    "left":     0.1,
+    "right":    0.2,
     "straight": 1.0,
 }
 
 # Frames to drive straight AFTER rotating before handing back to lane follow.
 POST_TURN_FRAMES = {
-    "left":     8, 
-    "right":    8,    
-    "straight": 8,
+    "left":     4, 
+    "right":    4,    
+    "straight": 4,
 }
 
 OBSTACLE_CLEAR_FRAMES = 8 
@@ -98,6 +99,7 @@ VEHICLE_CLEAR_FRAMES_CONFIRM = 6      # raised 3 → 6: require more frames befo
 # Misc timing constants
 # ---------------------------------------------------------------------------
 RED_LINE_COOLDOWN_S  = 7.0
+SIGN_MEMORY_S        = 10.0  # remember a tag seen shortly before the red line
 STOP_SIGN_WAIT_S     = 2.5
 YIELD_CREEP_S        = 5
 CROSSROAD_STOP_S     = 1.0
@@ -174,6 +176,12 @@ class TrafficRuleManager:
     approach_tag_id: Optional[int] = None
     peek_for_stop:   bool          = False
 
+    # Most recent known sign seen while approaching the intersection.
+    # This survives temporary detector loss and is copied into
+    # approach_tag_id when the red line is reached.
+    last_seen_tag_id: Optional[int] = None
+    last_seen_tag_at: float         = 0.0
+
     # ── yield creep timing ────────────────────────────────────────────────────
     yield_until: float = 0.0
 
@@ -200,6 +208,18 @@ class TrafficRuleManager:
     ) -> TrafficDecision:
         now     = time.time()
         threats = threats or []
+
+        # Read and remember the sign continuously, not only on the exact
+        # frame where the red line is detected. Once approach_tag_id is
+        # locked for the current intersection, later scans cannot replace it.
+        visible_tag_id = self._best_visible_tag(tags)
+        if visible_tag_id is not None and self.approach_tag_id is None:
+            self.last_seen_tag_id = visible_tag_id
+            self.last_seen_tag_at = now
+            print(
+                f"[TAG_MEMORY] remembered {TAG_NAMES.get(visible_tag_id, visible_tag_id)} "
+                f"(id={visible_tag_id})"
+            )
 
         # ── 0. DUCK / OBSTACLE STOP — absolute highest priority ───────────────
         #
@@ -337,8 +357,24 @@ class TrafficRuleManager:
                     f"({elapsed:.1f}s / {RED_LINE_COOLDOWN_S}s) — ignoring"
                 )
             else:
-                tag_id   = self._best_visible_tag(tags)
-                tag_name = TAG_NAMES.get(tag_id, "UNKNOWN") if tag_id else "NO TAG"
+                tag_id = visible_tag_id
+
+                # The sign may disappear from view just before the red line.
+                # In that case, use the most recently remembered tag.
+                memory_age = now - self.last_seen_tag_at
+                if (
+                    tag_id is None
+                    and self.last_seen_tag_id is not None
+                    and memory_age <= SIGN_MEMORY_S
+                ):
+                    tag_id = self.last_seen_tag_id
+                    print(
+                        f"[RED_LINE] using remembered tag "
+                        f"{TAG_NAMES.get(tag_id, tag_id)} (id={tag_id}), "
+                        f"last seen {memory_age:.2f}s ago"
+                    )
+
+                tag_name = TAG_NAMES.get(tag_id, "UNKNOWN") if tag_id is not None else "NO TAG"
                 print(
                     f"[RED_LINE] *** CROSSROAD DETECTED *** "
                     f"tag={tag_name} (id={tag_id})"
@@ -353,13 +389,18 @@ class TrafficRuleManager:
 
         # ── 2. CROSSROAD_STOP — brief halt, improve tag reading ───────────────
         if self.state == BehaviorState.CROSSROAD_STOP:
-            better_tag = self._best_visible_tag(tags)
-            if better_tag is not None and better_tag != self.approach_tag_id:
-                old = TAG_NAMES.get(self.approach_tag_id, str(self.approach_tag_id))
-                new = TAG_NAMES.get(better_tag, str(better_tag))
-                print(f"[CROSSROAD_STOP] tag updated {old} → {new} (id={better_tag})")
-                self.approach_tag_id = better_tag
-                self.peek_for_stop   = better_tag in STOP_TAGS
+            # Only fill the saved sign if none was known at the red line.
+            # Never replace an already locked approach sign while peeking around.
+            if self.approach_tag_id is None and visible_tag_id is not None:
+                self.approach_tag_id = visible_tag_id
+                self.peek_for_stop   = visible_tag_id in STOP_TAGS
+                self.last_seen_tag_id = visible_tag_id
+                self.last_seen_tag_at = now
+                print(
+                    f"[CROSSROAD_STOP] locked late-visible tag "
+                    f"{TAG_NAMES.get(visible_tag_id, visible_tag_id)} "
+                    f"(id={visible_tag_id})"
+                )
 
             if now < self.state_until:
                 tag_name = TAG_NAMES.get(self.approach_tag_id, "?")
@@ -648,7 +689,21 @@ class TrafficRuleManager:
         else:
             print(f"[PEEK/{self.peek_phase}] no vehicle  scanning={scan_side}")
 
-        # Log any tags visible during peek; update approach_tag_id if not yet set.
+        # If the red-line frame had no tag, restore the remembered approach sign.
+        if (
+            self.approach_tag_id is None
+            and self.last_seen_tag_id is not None
+            and now - self.last_seen_tag_at <= SIGN_MEMORY_S
+        ):
+            self.approach_tag_id = self.last_seen_tag_id
+            self.peek_for_stop   = self.approach_tag_id in STOP_TAGS
+            print(
+                f"[PEEK] restored remembered approach tag "
+                f"{TAG_NAMES.get(self.approach_tag_id, self.approach_tag_id)} "
+                f"(id={self.approach_tag_id})"
+            )
+
+        # Log any tags visible during peek; only use one when no sign was saved.
         for tag in tags:
             tid   = int(tag.get("id", -1))
             tname = TAG_NAMES.get(tid, f"id={tid}")
@@ -874,6 +929,8 @@ class TrafficRuleManager:
         self.chosen_turn          = None
         self.approach_tag_id      = None
         self.peek_for_stop        = False
+        self.last_seen_tag_id     = None
+        self.last_seen_tag_at     = 0.0
         self.yield_until          = 0.0
         self.pre_turn_frames_done  = 0
         self.post_turn_frames_done = 0
