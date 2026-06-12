@@ -19,6 +19,7 @@ HSV_FILE = os.path.normpath(
 
 try:
     with open(HSV_FILE, "r") as f:
+        print(HSV_FILE)
         _h = yaml.safe_load(f) or {}
 except FileNotFoundError:
     _h = {}
@@ -48,6 +49,43 @@ _white_upper = np.array([
     _h.get("white_upper_v", 255),
 ], dtype=np.uint8)
 
+# white_lower_h: 0
+# white_lower_s: 0
+# white_lower_v: 0
+# white_upper_h: 179
+# white_upper_s: 255
+# white_upper_v: 255
+# yellow_lower_h: 0
+# yellow_lower_s: 96
+# yellow_lower_v: 148
+# yellow_upper_h: 179
+# yellow_upper_s: 255
+# yellow_upper_v: 255
+
+
+# _yellow_lower = np.array([
+#     _h.get("yellow_lower_h", 0),
+#     _h.get("yellow_lower_s", 96),
+#     _h.get("yellow_lower_v", 148),
+# ], dtype=np.uint8)
+
+# _yellow_upper = np.array([
+#     _h.get("yellow_upper_h", 179),
+#     _h.get("yellow_upper_s", 255),
+#     _h.get("yellow_upper_v", 255),
+# ], dtype=np.uint8)
+
+# _white_lower = np.array([
+#     _h.get("white_lower_h", 0),
+#     _h.get("white_lower_s", 0),
+#     _h.get("white_lower_v", 0),
+# ], dtype=np.uint8)
+
+# _white_upper = np.array([
+#     _h.get("white_upper_h", 179),
+#     _h.get("white_upper_s", 255),
+#     _h.get("white_upper_v", 255),
+# ], dtype=np.uint8)
 
 _ROI_START = 0.42
 
@@ -163,6 +201,12 @@ def detect_lane_markings(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     Returns:
         yellow_mask, white_mask
     """
+    # print(_yellow_lower)
+    # print(_yellow_upper)
+#     10:12:18 AM//////////////////////////////////
+# 10:12:18 AM[ 0 96 148]
+# 10:12:18 AM[179 255 255]
+    # print("//////////////////////////////////")
     h, w = image.shape[:2]
 
     imghsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)

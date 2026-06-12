@@ -20,23 +20,120 @@ _SLICE_TOL = 6
 _SLICE_Y_RATIOS = [0.56, 0.64, 0.72, 0.80, 0.88]
 
 
-def _strip_center_x(mask: np.ndarray, y: int, prefer_right: bool = False):
+def _strip_center_x(mask: np.ndarray, y: int, white_x = None, prefer_right: bool = False, ):
     h, w = mask.shape[:2]
 
     y1 = max(0, y - _SLICE_TOL)
     y2 = min(h, y + _SLICE_TOL)
 
-    strip = mask[y1:y2, :]
+    strip = mask[y1:y2,:]
     idx = np.where(strip > 0)[1]
 
     if len(idx) == 0:
         return None
 
-    if prefer_right:
-        # Use right-biased value so random gray/floor blobs do not pull the line left.
-        return int(np.percentile(idx, 70))
+    idx = np.sort(idx)
 
-    return int(np.median(idx))
+    # Split pixels into separate clusters.
+    gaps = np.where(np.diff(idx) > 20)[0] + 1
+    clusters = np.split(idx, gaps)
+
+    valid_clusters = []
+
+    for cluster in clusters:
+        if len(cluster) < 3:
+            continue
+
+        cluster_left = int(cluster[0])
+        cluster_right = int(cluster[-1])
+        cluster_width = cluster_right - cluster_left + 1
+        cluster_center = float(np.median(cluster))
+
+        # Reject tiny noise.
+        if cluster_width < 3:
+            continue
+
+        if prefer_right:
+            # WHITE LINE:
+            # We only want the right-side white border.
+            if cluster_center < w * 0.35:
+                continue
+
+            # Reject far-right other-map white line in upper/middle part.
+            # if cluster_center > w * 0.88 and y < h * 0.78:
+            #     continue
+
+        else:
+            # YELLOW LINE:
+            # Yellow road line should usually be left/center, not far right.
+            if cluster_center > w * 0.75:
+                continue
+
+            # Ignore very far-left yellow noise.
+            # if cluster_center < w * 0.05:
+                # continue
+
+        valid_clusters.append(cluster)
+
+    if not valid_clusters:
+        return None
+
+    if prefer_right:
+        # WHITE:
+        # Choose nearest right-side white cluster.
+        # Then use its LEFT edge, because the lane is left of the white line.
+        best = min(valid_clusters, key=lambda c: np.median(c))
+
+        left_edge = int(best[0])
+        return left_edge 
+
+    # YELLOW:
+    # Choose strongest yellow cluster.
+    # Then use its RIGHT edge, because the lane is right of the yellow line.
+    # best = max(valid_clusters, key=lambda c: len(c))
+    
+    # Previous version -  won't work for duckies
+    # best = max(valid_clusters, key=lambda c: np.median(c))
+
+    # right_edge = int(best[-1])
+    # return right_edge - 10
+
+    # ducks shouldn't make a difference
+    candidates = valid_clusters
+    
+    
+    # don't take yellow to right of white
+    # if white_x is not None:
+    #     filtered = [c for c in candidates if c[-1] < white_x]
+
+    #     if filtered:
+    #         candidates = filtered
+        
+    
+        
+    if white_x is not None:
+        DIST_THRESH = 200  # todo tune
+
+        filtered = [
+            c for c in candidates
+            if abs(np.median(c) - white_x) > DIST_THRESH
+        ]
+
+        if len(filtered) > 0:
+            candidates = filtered
+
+    # todo yviteli borbali
+    # tetrze marjvniv ar iyos
+    best = max(candidates, key=lambda c: np.median(c))
+
+    
+    if white_x is not None:
+        dist = abs(np.median(best) - white_x)
+        print(f"yellow-white distance = {dist:.1f}px")
+        
+        
+    right_edge = int(best[-1])
+    return right_edge 
 
 
 def detect_lines_in_slices(
@@ -50,8 +147,9 @@ def detect_lines_in_slices(
     for ratio in _SLICE_Y_RATIOS:
         y = int(h * ratio)
 
-        yellow_x = _strip_center_x(mask_yellow, y, prefer_right=False)
         white_x = _strip_center_x(mask_white, y, prefer_right=True)
+        yellow_x = _strip_center_x(mask_yellow, y, white_x, prefer_right=False)
+        
 
         if yellow_x is not None:
             yellow_xs.append(yellow_x)
@@ -73,24 +171,28 @@ class LaneServoingAgent:
         except Exception:
             cfg = {}
 
-        self.p_gain = cfg.get("p_gain", 0.24)
+        self.p_gain = cfg.get("p_gain", 0.20)
         self.d_gain = cfg.get("d_gain", 0.11)
         self.max_steer = cfg.get("max_steer", 0.22)
-        self.base_speed = cfg.get("base_speed", 0.41)
-        self.curve_speed = cfg.get("curve_speed", 0.01)
+        self.base_speed = cfg.get("base_speed", 0.30)
+        self.curve_speed = cfg.get("curve_speed", 0.1)
         self.curve_threshold = cfg.get("curve_threshold", 350)
         self.steering_threshold = cfg.get("steering_threshold", 0.2)
         self.curve_boost = cfg.get("curve_boost", 1.0)
         self.detection_threshold = cfg.get("detection_threshold", 80)
-# base_speed: 0.41
+        
+        self._white_lane = []
+        
+# base_speed: 0.30
 # curve_boost: 1.0
 # curve_speed: 0.1
 # curve_threshold: 350
-# d_gain: 0.11
+# d_gain: 0.11   #heading gain
 # detection_threshold: 80
 # max_steer: 0.22
-# p_gain: 0.24
+# p_gain: 0.20    #lateral gain  franky - 0.18, 0.24 gladius (needs diff right checkpath frames)
 # steering_threshold: 0.2
+
 
         self.frame_count = 0
 
@@ -149,7 +251,7 @@ class LaneServoingAgent:
         raw_steering = self.p_gain * error + self.d_gain * error_diff
         raw_steering = float(np.clip(raw_steering, -self.max_steer, self.max_steer))
 
-        # Smooth steering to prevent sudden hard turns when white line flickers.
+        # Smooth steering to prevent sudden hard turns when white/yellow line flickers.
         max_delta = 0.035
         delta = np.clip(raw_steering - self._filtered_steering, -max_delta, max_delta)
 
@@ -175,7 +277,6 @@ class LaneServoingAgent:
         left = speed - steering
         right = speed + steering
 
-        # No aggressive curve boost. It caused extreme turns.
         return float(np.clip(left, 0.0, 0.35)), float(np.clip(right, 0.0, 0.35))
 
     def _smooth(self, left, right, both_visible):
@@ -229,6 +330,13 @@ class LaneServoingAgent:
 
         yellow_xs, white_xs = detect_lines_in_slices(mask_y, mask_w, h)
 
+        if len(yellow_xs) > 0 and len(white_xs) > 0:
+            self._white_lane = white_xs
+        else:
+            self._white_lane = []
+            
+            
+        
         left_det = len(yellow_xs) > 0
         right_det = len(white_xs) > 0
 

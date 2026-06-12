@@ -5,11 +5,11 @@ from typing import List, Optional, Tuple
 
 from tasks.final_project.packages.behavior_state import BehaviorState
 
-STOP_TAGS          = {20, 24, 25, 26}   # stop for 5 seconds
-YIELD_TAGS         = {39}               # creep slowly then go straight
-LEFT_RIGHT_TAGS    = {11}              # turn left OR right (random)
-LEFT_FORWARD_TAGS  = {10}             # turn left OR go forward (random)
-RIGHT_FORWARD_TAGS = {9}              # turn right OR go forward (random)
+STOP_TAGS          = {20, 24, 25, 26}
+YIELD_TAGS         = {39}
+LEFT_RIGHT_TAGS    = {11}
+LEFT_FORWARD_TAGS  = {10}
+RIGHT_FORWARD_TAGS = {9}
 
 ALL_KNOWN_TAGS = (
     STOP_TAGS | YIELD_TAGS |
@@ -28,7 +28,7 @@ TAG_NAMES = {
 }
 
 DRIVE_SPEED = 0.4
-CREEP_SPEED = 0.05   # slow for yield
+CREEP_SPEED = 0.05
 
 TURN_RIGHT  = (0.32, 0.02)
 TURN_LEFT = (0.02, 0.32)
@@ -36,35 +36,27 @@ TURN_LEFT = (0.02, 0.32)
 PEEK_L = (0.02, 0.14)
 PEEK_R = (0.14, 0.02)
 
-# ---------------------------------------------------------------------------
-# Intersection timing / frame tuning
-# ---------------------------------------------------------------------------
-
-CROSS_LINE_S = 0.05   # seconds to drive straight after red line to clear it
+CROSS_LINE_S = 0.05
 
 PRE_TURN_FRAMES = {
-    "left":     10,  # tune me
-    "right":    7,   # tune me
+    "left":     15,
+    "right":    10,
     "straight": 0,
 }
 
 TURN_DURATION = {
-    "left":     0.35,   # tune me
-    "right":    0.35,   # tune me
+    "left":     0.35,
+    "right":    0.35,
     "straight": 1.0,
 }
 
-# Frames to drive straight AFTER rotating before handing back to lane follow.
 POST_TURN_FRAMES = {
-    "left":     14, 
-    "right":    14,    
+    "left":     18, 
+    "right":    18,    
     "straight": 8,
 }
 
-# ---------------------------------------------------------------------------
-# Obstacle-stop parameters
-# ---------------------------------------------------------------------------
-OBSTACLE_CLEAR_FRAMES = 8   # raised 4 → 8: real camera needs more frames to confirm clear
+OBSTACLE_CLEAR_FRAMES = 8
 
 OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
     BehaviorState.LANE_FOLLOW,
@@ -78,62 +70,28 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
     BehaviorState.CROSSROAD_TURNING,
 })
 
+PEEK_FRAMES_L1 = 4
+PEEK_HOLD_1_S  = 1.0
+PEEK_FRAMES_R  = 4
+PEEK_HOLD_2_S  = 0
+PEEK_FRAMES_L2 = 0
 
-# ---------------------------------------------------------------------------
-# Peek parameters
-# ---------------------------------------------------------------------------
-PEEK_FRAMES_L1 = 4    # frames rotating left
-PEEK_HOLD_1_S  = 1.0  # hold & scan LEFT
-PEEK_FRAMES_R  = 8    # frames rotating right
-PEEK_HOLD_2_S  = 1.0  # hold & scan RIGHT
-PEEK_FRAMES_L2 = 4.5    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
+LEFT_YIELD_TIMEOUT_S         = 10.0
+VEHICLE_CLEAR_FRAMES_CONFIRM = 6
 
-
-# ---------------------------------------------------------------------------
-# Priority / yield parameters
-#
-# Rule: at any intersection (any sign type), LEFT HAS PRIORITY.
-#   • Vehicle seen during LEFT scan  → we yield until it clears (or timeout)
-#   • Vehicle seen during RIGHT scan → we have priority, proceed immediately
-# ---------------------------------------------------------------------------
-LEFT_YIELD_TIMEOUT_S         = 10.0   # max seconds to wait for left vehicle before proceeding
-VEHICLE_CLEAR_FRAMES_CONFIRM = 6      # raised 3 → 6: require more frames before proceeding
-
-
-# ---------------------------------------------------------------------------
-# Misc timing constants
-# ---------------------------------------------------------------------------
 RED_LINE_COOLDOWN_S  = 7
 STOP_SIGN_WAIT_S     = 3
 YIELD_CREEP_S        = 3
 CROSSROAD_STOP_S     = 0.5
-
-# Area threshold for vehicle detection during peek / observation.
-# Slightly lower than the frontal-threat threshold (0.012) so partially-visible
-# side-approaching vehicles are still caught.
-# A vertical gate (cy_norm >= 0.25) separately filters horizon-level noise.
 PEEK_MIN_AREA_FRACTION = 0.008
-
-# Problem 5: require this many observations on a given side before treating it
-# as a confirmed vehicle detection.  Prevents single-frame YOLO glitches from
-# triggering a full yield sequence.
 PEEK_MIN_DETECTIONS_FOR_SIDE = 3
 
-
-# ---------------------------------------------------------------------------
-# Peek sub-state labels
-# ---------------------------------------------------------------------------
 PH_L1    = "L1"
 PH_HOLD1 = "HOLD1"
 PH_R     = "R"
 PH_HOLD2 = "HOLD2"
 PH_L2    = "L2"
 PH_DONE  = "DONE"
-
-
-# ---------------------------------------------------------------------------
-# Data classes
-# ---------------------------------------------------------------------------
 
 @dataclass
 class TrafficDecision:
@@ -147,7 +105,6 @@ class TrafficDecision:
 
 @dataclass
 class TrafficRuleManager:
-    # ── core state ───────────────────────────────────────────────────────────
     state:       BehaviorState = BehaviorState.LANE_FOLLOW
     state_until: float         = 0.0
     turn_until:  float         = 0.0
@@ -155,7 +112,6 @@ class TrafficRuleManager:
     active_tag_id: Optional[int] = None
     chosen_turn:   Optional[str] = None
 
-    # ── obstacle stop ─────────────────────────────────────────────────────────
     obstacle_clear_frames: int             = 0
     # State to return to once the duck/obstacle clears.  None means fall back
     # to LANE_FOLLOW (safe default for interruptions during plain driving).
@@ -210,7 +166,12 @@ class TrafficRuleManager:
         detections:    List[tuple],
         red_line_seen: bool = False,
         threats=None,
+        side_vehicle:  Optional[Tuple[float, str, float]] = None,
     ) -> TrafficDecision:
+        # Store the colour-based side-vehicle result (from CorridorObstacleDetector
+        # .detect_side_vehicle()) so _vehicle_offset_and_side() can use it instead
+        # of the YOLO detections list, which is now always empty.
+        self._current_side_vehicle = side_vehicle
         now     = time.time()
         threats = threats or []
 
@@ -856,7 +817,14 @@ class TrafficRuleManager:
     ) -> Optional[Tuple[float, str, float]]:
         """
         Returns (offset_from_centre, side, cx_norm) for the most prominent
-        vehicle in view (largest bbox area), or None if none qualify.
+        vehicle in view, or None if none qualify.
+
+        Priority order:
+          1. Colour-based result from CorridorObstacleDetector.detect_side_vehicle()
+             stored in self._current_side_vehicle by update().  This replaces
+             the YOLO-based vehicle scan now that the YOLO pipeline is removed.
+          2. Legacy YOLO detections list (kept for backward compat; will be
+             empty in normal operation post-migration).
 
         "Most prominent" = largest area, NOT most centred.  During a left peek
         the approaching truck is near the left edge of the frame; sorting by
@@ -865,6 +833,12 @@ class TrafficRuleManager:
         Uses PEEK_MIN_AREA_FRACTION so partially-visible side vehicles are caught.
         A vertical gate (cy_norm >= 0.25) filters far-away horizon detections.
         """
+        # Prefer the colour-based detection if it was provided this frame.
+        sv = getattr(self, '_current_side_vehicle', None)
+        if sv is not None:
+            return sv   # (offset, side, cx_norm) — already in the right format
+
+        # Fallback: YOLO detections (empty in post-migration operation).
         h, w = frame_shape[:2]
         best_area = 0.0
         best: Optional[Tuple[float, str, float]] = None

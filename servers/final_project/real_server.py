@@ -3,7 +3,6 @@ import os
 import signal
 import threading
 import time
-import queue
 import socket
 
 script_dir   = os.path.dirname(os.path.abspath(__file__))
@@ -11,13 +10,75 @@ project_root = os.path.join(script_dir, '..', '..')
 sys.path.insert(0, project_root)
 
 import cv2
+import numpy as np
 from flask import Flask, Response, render_template_string, jsonify, request
 
 from tasks.final_project.packages.agent import FinalProjectAgent
 from tasks.final_project.packages.apriltag_activity import draw_tags
-from tasks.object_detection.packages.agent import ObjectDetectionAgent, CLASS_NAMES
-from servers.object_detection.visualization import draw_detections
-from servers.templates.object_detection import OBJECT_DETECTION_TEMPLATE as HTML_TEMPLATE
+
+# ── Inline template — no dependency on the old object_detection package ───────
+_HTML = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Duckiebot — Final Project ({{ hostname }})</title>
+<style>
+  body  { margin:0; background:#111; color:#eee; font-family:monospace; }
+  h2    { margin:8px 12px; font-size:1rem; color:#aef; }
+  #feed { display:block; max-width:100%; border:2px solid #333; }
+  #controls { padding:8px 12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { padding:6px 14px; border:none; border-radius:4px; cursor:pointer;
+           font-size:.85rem; background:#444; color:#eee; }
+  button:hover { background:#666; }
+  #btnStart { background:#2a7; } #btnStop { background:#a33; }
+  #mode-row { padding:4px 12px; }
+  label { margin-right:12px; cursor:pointer; }
+  #status { padding:6px 12px; font-size:.8rem; color:#bbb; min-height:1.4em; }
+</style>
+</head>
+<body>
+<h2>Duckiebot — Final Project &mdash; {{ hostname }}</h2>
+<img id="feed" src="/video">
+<div id="controls">
+  <button id="btnStart" onclick="post('/start')">&#9654; Start</button>
+  <button id="btnStop"  onclick="post('/stop')">&#9632; Stop</button>
+  <button onclick="post('/reset')">&#8635; Reset</button>
+</div>
+<div id="mode-row">
+  <label><input type="radio" name="mode" value="auto"   onchange="setMode('auto')"   checked> Auto</label>
+  <label><input type="radio" name="mode" value="manual" onchange="setMode('manual')"> Manual (WASD)</label>
+</div>
+<div id="status">—</div>
+<script>
+function post(url, data) {
+  fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify(data||{})});
+}
+function setMode(m) { post('/set_mode', {mode:m}); }
+
+const keys = {w:false, a:false, s:false, d:false};
+document.addEventListener('keydown', e => { if(e.key in keys){ keys[e.key]=true;  sendKeys(); }});
+document.addEventListener('keyup',   e => { if(e.key in keys){ keys[e.key]=false; sendKeys(); }});
+function sendKeys() {
+  post('/keys', {up:keys.w, down:keys.s, left:keys.a, right:keys.d});
+}
+
+setInterval(() => {
+  fetch('/status').then(r => r.json()).then(d => {
+    const threats = (d.threats||[])
+      .map(t => t.label + '@(' + t.cx.toFixed(2) + ',' + t.cy.toFixed(2)
+               + ') ' + t.zone).join('  ');
+    document.getElementById('status').textContent = [
+      d.running ? '🟢 running' : '🔴 stopped',
+      'state='  + (d.behavior_state  || '?'),
+      'reason=' + (d.behavior_reason || '?'),
+      threats ? '⚠ ' + threats : '',
+    ].filter(Boolean).join('  |  ');
+  }).catch(() => {});
+}, 500);
+</script>
+</body>
+</html>"""
 
 from duckiebot.camera_driver import CameraDriver
 from duckiebot.wheel_driver import DaguWheelsDriver
@@ -29,7 +90,6 @@ from servers.common import make_frame_generator, shutdown_cleanup, suppress_http
 app = Flask(__name__)
 
 agent     = None
-det_agent = None
 camera    = None
 wheels    = None
 
@@ -37,37 +97,9 @@ running     = False
 manual_mode = False
 stop_event  = threading.Event()
 
-_frame_queue     = queue.Queue(maxsize=1)
-_last_detections = []
-_detection_lock  = threading.Lock()
-
 keys_pressed      = {'up': False, 'down': False, 'left': False, 'right': False}
 _keys_lock        = threading.Lock()
 _keys_last_update = time.time()
-
-# Only send every Nth frame to the object detector.
-# Camera runs at ~30 fps; N=3 gives ~10 fps detection which is plenty
-# for a slow-moving robot and keeps CPU/GPU load low.
-DETECTION_EVERY_N_FRAMES = 3
-_det_frame_counter = 0
-
-
-def detection_loop():
-    global _last_detections
-    while not stop_event.is_set():
-        if det_agent is None or not det_agent.model_loaded:
-            time.sleep(0.1)
-            continue
-
-        try:
-            frame_rgb = _frame_queue.get(timeout=0.5)
-        except queue.Empty:
-            continue
-
-        result = det_agent.detect(frame_rgb)
-        if result is not None:
-            with _detection_lock:
-                _last_detections = result
 
 
 def manual_control_loop():
@@ -103,51 +135,63 @@ def manual_control_loop():
         time.sleep(0.05)
 
 
+def _draw_corridor_overlay(frame_bgr: np.ndarray) -> None:
+    """
+    Draw the curved driving corridor and any active threats onto *frame_bgr*.
+
+    The corridor is drawn as two polylines — one tracing the yellow centre-line
+    (left boundary, drawn in yellow) and one tracing the white right boundary
+    (drawn in cyan).  These follow road curvature rather than being vertical
+    straight lines.  Active threats are shown as labelled circles.
+    """
+    if agent is None:
+        return
+    h, w = frame_bgr.shape[:2]
+
+    poly = agent.obj_detector.last_corridor_poly   # [(y, left_x, right_x), ...]
+    if poly and len(poly) >= 2:
+        left_pts  = np.array([[lx, y] for y, lx, _  in poly], dtype=np.int32)
+        right_pts = np.array([[rx, y] for y, _,  rx in poly], dtype=np.int32)
+        # Yellow lane boundary → yellow (BGR 0, 200, 200)
+        cv2.polylines(frame_bgr, [left_pts.reshape(-1, 1, 2)],  False, (0, 200, 200), 2)
+        # White lane boundary  → cyan   (BGR 200, 200, 0)
+        cv2.polylines(frame_bgr, [right_pts.reshape(-1, 1, 2)], False, (200, 200, 0), 2)
+
+    for t in agent.last_threats:
+        cx_px = int(t.cx_norm * w)
+        cy_px = int(t.cy_norm * h)
+        colour = (0, 80, 255) if t.cls_id == 0 else (255, 120, 0)
+        cv2.circle(frame_bgr, (cx_px, cy_px), 18, colour, 3)
+        cv2.putText(frame_bgr, f"{t.label}[{t.proximity_zone}]",
+                    (cx_px - 40, cy_px - 24),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.50, colour, 2, cv2.LINE_AA)
+
+
 def visualize(frame_bgr):
     """
     Receives a BGR frame from the real camera (CameraDriver).
-    Mirrors virtual.server.py logic but works in BGR space throughout.
+    Obstacle detection is handled inside FinalProjectAgent (corridor-based,
+    no external YOLO model required).
     """
-    global _det_frame_counter
-
     frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-
-    # Object detector runs in a side thread.
-    # FIX 1: queue frame BEFORE the wheels guard so detection starts immediately.
-    # FIX 2: pre-resize to model input size to reduce queue bandwidth.
-    # FIX 3: only queue every DETECTION_EVERY_N_FRAMES frames to limit GPU load.
-    _det_frame_counter += 1
-    if (det_agent is not None and det_agent.model_loaded
-            and _det_frame_counter % DETECTION_EVERY_N_FRAMES == 0):
-        try:
-            small = cv2.resize(frame_rgb, (det_agent.img_size, det_agent.img_size))
-            _frame_queue.put_nowait(small)
-        except queue.Full:
-            pass
 
     if wheels is None:
         return frame_bgr
 
-    with _detection_lock:
-        detections = list(_last_detections)
-
     if manual_mode:
         pass
     elif agent is not None:
-        pwm_left, pwm_right = agent.compute_commands(frame_rgb, detections=detections)
+        pwm_left, pwm_right = agent.compute_commands(frame_rgb)
 
         if running:
             wheels.set_wheels_speed(pwm_left, pwm_right)
         else:
             wheels.set_wheels_speed(0.0, 0.0)
 
-    # Draw YOLO detections.
-    if det_agent is not None and det_agent.model_loaded and detections:
-        draw_detections(frame_bgr, detections)
-
-    # Draw AprilTags and behavior state.
+    # Draw AprilTags, corridor overlay, and behavior state.
     if agent is not None:
         draw_tags(frame_bgr, agent.last_tags)
+        _draw_corridor_overlay(frame_bgr)
         decision = agent.last_decision
         if decision:
             cv2.putText(
@@ -169,12 +213,7 @@ generate_frames = make_frame_generator(lambda: camera, visualize, quality=50, rg
 
 @app.route('/')
 def index():
-    return render_template_string(
-        HTML_TEMPLATE,
-        config=det_agent,
-        hostname=socket.gethostname(),
-        virtual=False,
-    )
+    return render_template_string(_HTML, hostname=socket.gethostname())
 
 
 @app.route('/video')
@@ -200,7 +239,7 @@ def stop():
 
 @app.route('/reset', methods=['POST'])
 def reset():
-    global _last_detections, running
+    global running
     running = False
     if wheels:
         wheels.set_wheels_speed(0.0, 0.0)
@@ -208,8 +247,7 @@ def reset():
         agent.rules._reset_state()
         agent.last_tags     = []
         agent.last_decision = None
-    with _detection_lock:
-        _last_detections = []
+        agent.last_threats  = []
     return jsonify({'status': 'reset'})
 
 
@@ -234,29 +272,13 @@ def update_keys():
     return jsonify({'status': 'ok'})
 
 
-@app.route('/set_threshold', methods=['POST'])
-def set_threshold():
-    value = request.json.get('value') if request.json else None
-    if det_agent and value is not None:
-        det_agent.conf_threshold = float(value)
-    return jsonify({'conf_threshold': det_agent.conf_threshold if det_agent else None})
-
-
 @app.route('/status')
 def status():
-    with _detection_lock:
-        dets = list(_last_detections)
-
     decision = agent.last_decision if agent else None
 
     return jsonify({
         'running':      running,
         'manual_mode':  manual_mode,
-
-        'model_loaded': det_agent.model_loaded if det_agent else False,
-        'load_error':   det_agent.load_error if det_agent else None,
-        'trt_building': getattr(det_agent, 'trt_building', False) if det_agent else False,
-        'conf_threshold': det_agent.conf_threshold if det_agent else 0.5,
 
         'apriltag_ready':   agent.tag_detector.ready if agent else False,
         'apriltag_backend': agent.tag_detector.backend if agent else None,
@@ -267,15 +289,22 @@ def status():
         'active_tag_id':   decision.active_tag_id if decision else None,
         'chosen_turn':     decision.chosen_turn if decision else None,
 
-        'detections': [
-            {'class': CLASS_NAMES.get(c, str(c)), 'score': round(s, 3), 'bbox': list(b)}
-            for b, s, c in dets
+        'threats': [
+            {
+                'label': t.label,
+                'side':  t.side,
+                'area':  round(t.area_frac, 4),
+                'cx':    round(t.cx_norm,   3),
+                'cy':    round(t.cy_norm,   3),
+                'zone':  t.proximity_zone,
+            }
+            for t in (agent.last_threats if agent else [])
         ],
     })
 
 
 def main():
-    global agent, det_agent, camera, wheels
+    global agent, camera, wheels
 
     import argparse
     ap = argparse.ArgumentParser()
@@ -300,21 +329,14 @@ def main():
         print('[Init] Camera ready')
 
     def _init_agents():
-        global agent, det_agent
+        global agent
         agent = FinalProjectAgent()
         print(f'[Init] FinalProjectAgent ready — lane speed: {agent.lane_agent.base_speed}')
         print(f'[Init] AprilTag ready: {agent.tag_detector.ready} ({agent.tag_detector.backend})')
 
-        det_agent = ObjectDetectionAgent()
-        if det_agent.model_loaded:
-            print(f'[Init] YOLO ready: {det_agent.img_size}px')
-        else:
-            print(f'[Init] YOLO WARNING: {det_agent.load_error}')
-
     threading.Thread(target=_init_wheels,        daemon=True).start()
     threading.Thread(target=_init_camera,        daemon=True).start()
     threading.Thread(target=_init_agents,        daemon=True).start()
-    threading.Thread(target=detection_loop,      daemon=True).start()
     threading.Thread(target=manual_control_loop, daemon=True).start()
 
     def _shutdown(signum, frame):
