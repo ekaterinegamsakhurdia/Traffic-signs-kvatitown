@@ -37,17 +37,17 @@ TURN_LEFT = (-0.2, 0.9)
 PEEK_L = (-0.02, 0.5)
 PEEK_R = (0.5, -0.02)
 
-CROSS_LINE_S = 3
+CROSS_LINE_S = 0
 
 PRE_TURN_FRAMES = {
-    "left":     6,  
-    "right":    3,  
+    "left":     25,  
+    "right":    15,  
     "straight": 10,
 }
 
 
 TURN_DURATION = {
-    "left":     0.1,
+    "left":     0.2,
     "right":    0.1,
     "straight": 1.0,
 }
@@ -73,12 +73,16 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
 })
 
 
-PEEK_FRAMES_L1 = 2    # frames rotating left
-PEEK_HOLD_1_S  = 1.0  # hold & scan LEFT
-PEEK_FRAMES_R  = 3    # frames rotating right
-PEEK_HOLD_2_S  = 1.0  # hold & scan RIGHT
-PEEK_FRAMES_L2 = 2    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
-
+# PEEK_FRAMES_L1 = 2    # frames rotating left
+# PEEK_HOLD_1_S  = 1.0  # hold & scan LEFT
+# PEEK_FRAMES_R  = 5    # frames rotating right
+# PEEK_HOLD_2_S  = 1.0  # hold & scan RIGHT
+# PEEK_FRAMES_L2 = 2    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
+PEEK_FRAMES_L1 = 0    # frames rotating left
+PEEK_HOLD_1_S  = 0.0  # hold & scan LEFT
+PEEK_FRAMES_R  = 0    # frames rotating right
+PEEK_HOLD_2_S  = 0.0  # hold & scan RIGHT
+PEEK_FRAMES_L2 = 0    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
 
 # ---------------------------------------------------------------------------
 # Priority / yield parameters
@@ -594,12 +598,14 @@ class TrafficRuleManager:
                                    BehaviorState.YIELD_WAIT, "yield: creeping", tag_id)
 
         if tag_id in LEFT_RIGHT_TAGS:
-            direction = random.choice(["left", "right"])
+            # direction = random.choice(["left", "right"])
+            direction = random.choice(["right"])
             print(f"[CROSSROAD_GO] LEFT_OR_RIGHT → random choice: {direction}")
             return self._enter_crossroad_pre_turn(direction, now, tag_id)
 
         if tag_id in LEFT_FORWARD_TAGS:
-            direction = random.choice(["left", "straight"])
+            # direction = random.choice(["left", "straight"])
+            direction = random.choice(["left"])
             print(f"[CROSSROAD_GO] LEFT_OR_FORWARD → random choice: {direction}")
             return self._enter_crossroad_pre_turn(direction, now, tag_id)
 
