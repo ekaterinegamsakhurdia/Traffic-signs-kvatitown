@@ -1,32 +1,35 @@
 from typing import List, Optional, Tuple
 
-# Minimum fraction of frame area the bbox must occupy to be considered a threat.
-MIN_AREA_FRACTION = 0.0005
+# Minimum fraction of real frame area the bbox must occupy to be a threat.
+# 0.004 suits small Duckietown duckies at close range.
+# Raise toward 0.02 to ignore farther/smaller detections.
+MIN_AREA_FRACTION = 0.0
 
-# Horizontal corridor: ±44% from centre = 6%–94% of frame width.
-# Raised from 0.30 → 0.44 so ducks at the white edge line (~cx 0.85–0.90)
-# and yellow centre line (~cx 0.20–0.30) are both inside the corridor.
-FRONTAL_CORRIDOR_HW = 0.9
+# Horizontal corridor half-width from centre (normalised).
+# 0.44 → accepts cx in 0.06–0.94 (covers ducks at white/yellow lane lines).
+# Narrow toward 0.20 if you only want strictly frontal threats.
+FRONTAL_CORRIDOR_HW = 0.2
 
-# Objects above this y-fraction are too far away (near horizon).
-# Lowered from 0.35 → 0.28 to react earlier during the approach.
-FRONTAL_LOWER_GATE = 0.1
+# cy_bottom threshold per class.
+# Duck sits low on the road — camera sees it at cy_bottom ~0.35–0.46 max before passing under.
+# Truck is taller and visible from further away, so can afford a stricter threshold.
+# Lower toward 0.25 for earlier trigger; raise toward 0.50 to require closer approach.
+LOWER_ZONE_DUCK    = 0.35
+LOWER_ZONE_TRUCK   = 0.7
 
 CLASS_NAMES = {0: "DUCK", 1: "VEHICLE", 2: "SIGN"}
 
 
 class ThreatObject:
-    """Represents a single detected collision threat."""
-
     def __init__(
         self,
-        cls_id:     int,
-        bbox:       Tuple[float, float, float, float],
-        score:      float,
-        cx_norm:    float,
-        cy_norm:    float,
-        area_frac:  float,
-        side:       Optional[str] = None,
+        cls_id:    int,
+        bbox:      Tuple[float, float, float, float],
+        score:     float,
+        cx_norm:   float,
+        cy_norm:   float,
+        area_frac: float,
+        side:      Optional[str] = None,
     ):
         self.cls_id    = cls_id
         self.label     = CLASS_NAMES.get(cls_id, str(cls_id))
@@ -47,10 +50,10 @@ class ThreatObject:
 
 class ObjectThreatDetector:
     """
-    Analyses raw YOLO detections and flags collision threats.
+    Analyses YOLO detections (already filtered by integration_activity)
+    and flags collision threats using geometric gates.
 
-    Usage
-    -----
+    Usage:
         detector = ObjectThreatDetector()
         threats  = detector.evaluate(frame_shape, detections)
     """
@@ -74,11 +77,12 @@ class ObjectThreatDetector:
             relevant_count += 1
             x1, y1, x2, y2 = [float(v) for v in bbox]
 
-            bw        = x2 - x1
-            bh        = y2 - y1
-            area_frac = (bw * bh) / frame_area
-            cx_norm   = ((x1 + x2) / 2.0) / w
-            cy_norm   = ((y1 + y2) / 2.0) / h
+            bw           = x2 - x1
+            bh           = y2 - y1
+            area_frac    = (bw * bh) / frame_area
+            cx_norm      = ((x1 + x2) / 2.0) / w
+            cy_norm      = ((y1 + y2) / 2.0) / h
+            cy_bottom    = y2 / h
 
             label = CLASS_NAMES.get(cls_id, str(cls_id))
 
@@ -87,17 +91,18 @@ class ObjectThreatDetector:
                 if verbose:
                     print(
                         f"[OBJ_DETECT] {label} score={score:.2f} "
-                        f"area={area_frac:.4f} -> too small, ignored"
+                        f"area={area_frac:.4f} -> too small, ignored" 
                     )
                 continue
-
-            # ── vertical gate ────────────────────────────────────────────────
-            if cy_norm < FRONTAL_LOWER_GATE:
+            lower_zone = LOWER_ZONE_DUCK if cls_id == 0 else LOWER_ZONE_TRUCK
+            if cy_bottom < lower_zone:
                 if verbose:
                     print(
                         f"[OBJ_DETECT] {label} score={score:.2f} "
-                        f"cy={cy_norm:.2f} -> too high in frame (far), ignored"
+                        f"cy_bottom={cy_bottom:.2f} -> not in lower zone, ignored"
                     )
+                    print(MIN_AREA_FRACTION )
+                    print(FRONTAL_CORRIDOR_HW)
                 continue
 
             # ── horizontal corridor ──────────────────────────────────────────
@@ -107,15 +112,15 @@ class ObjectThreatDetector:
                 if verbose:
                     print(
                         f"[OBJ_DETECT] {label} score={score:.2f} "
-                        f"cx={cx_norm:.2f} deviation={deviation:.2f} "
-                        f"-> out of frontal corridor ({side_str}), not a frontal threat"
+                        f"cx={cx_norm:.2f} -> out of corridor ({side_str}), ignored"
                     )
                 continue
-
+            print(cx_norm)
+            print(deviation)
             # ── all gates passed → threat ────────────────────────────────────
             side = (
-                "left"   if cx_norm < 0.1 else
-                "right"  if cx_norm > 0.9 else
+                "left"   if cx_norm < 0.4 else
+                "right"  if cx_norm > 0.6 else
                 "centre"
             )
 
@@ -133,14 +138,14 @@ class ObjectThreatDetector:
             if verbose:
                 print(
                     f"[OBJ_DETECT] *** THREAT *** {label} score={score:.2f} "
-                    f"cx={cx_norm:.2f} cy={cy_norm:.2f} "
+                    f"cx={cx_norm:.2f} cy_bottom={cy_bottom:.2f} "
                     f"area={area_frac:.4f} side={side}"
                 )
 
         if verbose and not threats and relevant_count > 0:
             print(
-                f"[OBJ_DETECT] {relevant_count} duck/vehicle detection(s) present "
-                f"but none qualify as frontal threats"
+                f"[OBJ_DETECT] {relevant_count} duck/vehicle detection(s) found "
+                f"but none passed all gates"
             )
 
         return threats

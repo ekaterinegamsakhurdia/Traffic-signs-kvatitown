@@ -3,7 +3,7 @@ MODEL_PATH = "tasks/object_detection/models/best.onnx"
 
 
 def NUMBER_FRAMES_SKIPPED() -> int:
-    return 1
+    return 2
 
 
 def filter_by_classes(pred_class: int) -> bool:
