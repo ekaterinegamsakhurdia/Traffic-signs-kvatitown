@@ -3,19 +3,19 @@ from typing import List, Optional, Tuple
 # Minimum fraction of real frame area the bbox must occupy to be a threat.
 # 0.004 suits small Duckietown duckies at close range.
 # Raise toward 0.02 to ignore farther/smaller detections.
-MIN_AREA_FRACTION = 0.0
+MIN_AREA_FRACTION = 0.04
 
 # Horizontal corridor half-width from centre (normalised).
 # 0.44 → accepts cx in 0.06–0.94 (covers ducks at white/yellow lane lines).
 # Narrow toward 0.20 if you only want strictly frontal threats.
-FRONTAL_CORRIDOR_HW = 0.2
+FRONTAL_CORRIDOR_HW = 0.5
 
 # cy_bottom threshold per class.
 # Duck sits low on the road — camera sees it at cy_bottom ~0.35–0.46 max before passing under.
 # Truck is taller and visible from further away, so can afford a stricter threshold.
 # Lower toward 0.25 for earlier trigger; raise toward 0.50 to require closer approach.
-LOWER_ZONE_DUCK    = 0.35
-LOWER_ZONE_TRUCK   = 0.7
+LOWER_ZONE_DUCK    = 0.6
+LOWER_ZONE_TRUCK   = 0.5
 
 CLASS_NAMES = {0: "DUCK", 1: "VEHICLE", 2: "SIGN"}
 
@@ -101,7 +101,7 @@ class ObjectThreatDetector:
                         f"[OBJ_DETECT] {label} score={score:.2f} "
                         f"cy_bottom={cy_bottom:.2f} -> not in lower zone, ignored"
                     )
-                    print(MIN_AREA_FRACTION )
+                    print(MIN_AREA_FRACTION)
                     print(FRONTAL_CORRIDOR_HW)
                 continue
 

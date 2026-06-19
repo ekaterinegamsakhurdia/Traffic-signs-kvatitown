@@ -13,7 +13,7 @@ CENTERED_MAX = 0.90
 # From logs, duck on road peaks at cy_bottom ~0.46 before passing under camera.
 # 0.35 catches it with reaction time. Lower toward 0.25 for earlier trigger.
 # Raise toward 0.50 only if getting false positives from distant objects.
-LOWER_ZONE_THRESHOLD = 0.35
+LOWER_ZONE_THRESHOLD = 0.6
 
 # Minimum bbox area relative to frame area.
 # Small Duckietown duckies at trigger distance are ~0.001–0.004.

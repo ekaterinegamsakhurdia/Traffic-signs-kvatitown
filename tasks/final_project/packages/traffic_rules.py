@@ -31,30 +31,30 @@ TAG_NAMES = {
 DRIVE_SPEED = 0.4
 CREEP_SPEED = 0.05
 
-TURN_RIGHT  = (0.9, -0.2)
-TURN_LEFT = (-0.2, 0.9)
+TURN_RIGHT  = (1, -0.4)
+TURN_LEFT = (-0.4, 1)
 
 PEEK_L = (-0.02, 0.5)
-PEEK_R = (0.5, -0.02)
+# PEEK_R = (0.5, -0.02)
 
 CROSS_LINE_S = 0
 
 PRE_TURN_FRAMES = {
-    "left":     25,  
-    "right":    15,  
+    "left":     19,  
+    "right":    10,  
     "straight": 10,
 }
 
 
 TURN_DURATION = {
     "left":     0.2,
-    "right":    0.1,
+    "right":    0.2,
     "straight": 1.0,
 }
 
 POST_TURN_FRAMES = {
-    "left":     5, 
-    "right":    5,    
+    "left":     8, 
+    "right":    8,    
     "straight": 5,
 }
 
@@ -78,10 +78,10 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
 # PEEK_FRAMES_R  = 5    # frames rotating right
 # PEEK_HOLD_2_S  = 1.0  # hold & scan RIGHT
 # PEEK_FRAMES_L2 = 2    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
-PEEK_FRAMES_L1 = 0    # frames rotating left
-PEEK_HOLD_1_S  = 0.0  # hold & scan LEFT
-PEEK_FRAMES_R  = 0    # frames rotating right
-PEEK_HOLD_2_S  = 0.0  # hold & scan RIGHT
+PEEK_FRAMES_L1 = 3    # frames rotating left
+PEEK_HOLD_1_S  = 0.5  # hold & scan LEFT
+PEEK_FRAMES_R  = 3    # frames rotating right
+PEEK_HOLD_2_S  = 0  # hold & scan RIGHT
 PEEK_FRAMES_L2 = 0    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
 
 # ---------------------------------------------------------------------------
@@ -99,10 +99,10 @@ VEHICLE_CLEAR_FRAMES_CONFIRM = 6      # raised 3 → 6: require more frames befo
 # Misc timing constants
 # ---------------------------------------------------------------------------
 RED_LINE_COOLDOWN_S  = 7.0
-SIGN_MEMORY_S        = 10.0  # remember a tag seen shortly before the red line
-STOP_SIGN_WAIT_S     = 2.5
-YIELD_CREEP_S        = 5
-CROSSROAD_STOP_S     = 1.0
+SIGN_MEMORY_S        = 7.0  # remember a tag seen shortly before the red line
+STOP_SIGN_WAIT_S     = 2.0
+YIELD_CREEP_S        = 3
+CROSSROAD_STOP_S     = 0.5
 
 # Area threshold for vehicle detection during peek / observation.
 # Slightly lower than the frontal-threat threshold (0.012) so partially-visible
