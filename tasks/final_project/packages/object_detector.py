@@ -2,29 +2,36 @@ from collections import deque
 from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
-# Tunable gates
+# Tunable threat gates — DUCK (cls_id = 0)
 # ---------------------------------------------------------------------------
+# Keep these at your current working duck values.  Truck tuning below will
+# not change duck detection.
 
-# Minimum fraction of real frame area the bbox must occupy to be a threat.
-# 0.008 catches small Duckietown duckies at close range; raise toward 0.02
-# to ignore farther/smaller detections.
-MIN_AREA_FRACTION = 0.008
+DUCK_MIN_CONFIDENCE      = 0.50
+DUCK_MIN_AREA_FRACTION   = 0.008
+DUCK_FRONTAL_CORRIDOR_HW = 0.30
+DUCK_LOWER_ZONE          = 0.60
+DUCK_ZONE_CRITICAL_AREA  = 0.040
+DUCK_ZONE_DANGER_AREA    = 0.012
 
-# Horizontal corridor half-width from centre (normalised).
-# 0.30 → accepts cx in 0.20–0.80 (strictly frontal zone).
-# Widen toward 0.45 if lane-edge ducks are being missed.
-FRONTAL_CORRIDOR_HW = 0.30
+# ---------------------------------------------------------------------------
+# Tunable threat gates — TRUCK / VEHICLE (cls_id = 1)
+# ---------------------------------------------------------------------------
+# These start deliberately stricter than the duck gates:
+#   • higher confidence      = ignores weaker YOLO truck predictions
+#   • larger bbox required   = ignores farther/smaller trucks
+#   • narrower corridor      = ignores trucks beside our lane
+#   • lower screen gate      = truck must be visibly closer before it blocks us
+#
+# Increase MIN_AREA / LOWER_ZONE / MIN_CONFIDENCE to make truck detection
+# even stricter.  Decrease them if the robot begins missing a real truck.
 
-# cy_bottom thresholds per class.
-# Duck sits low — camera sees it at cy_bottom ~0.35–0.46 before passing under.
-# Truck is taller and visible from further away.
-LOWER_ZONE_DUCK  = 0.6
-LOWER_ZONE_TRUCK = 0.3
-
-# Proximity zones based on area fraction (larger area = closer = more danger).
-# Tune these to match your actual camera / robot scale.
-ZONE_CRITICAL_AREA = 0.04   # very close — immediate emergency stop
-ZONE_DANGER_AREA   = 0.012  # close — priority stop
+TRUCK_MIN_CONFIDENCE      = 0.60
+TRUCK_MIN_AREA_FRACTION   = 0.015
+TRUCK_FRONTAL_CORRIDOR_HW = 0.40
+TRUCK_LOWER_ZONE          = 0.50
+TRUCK_ZONE_CRITICAL_AREA  = 0.060
+TRUCK_ZONE_DANGER_AREA    = 0.025
 
 # Motion tracking: how many frames of cx/area history to keep per vehicle.
 # Used by traffic_rule_manager to decide stationary vs moving.
@@ -80,9 +87,19 @@ class ThreatObject:
         self.is_vehicle    = cls_id == 1
         self.is_stationary = is_stationary
 
-        if area_frac >= ZONE_CRITICAL_AREA:
+        # Duck and truck proximity zones are intentionally independent.
+        # This lets traffic_rules.py use the same zone names while each class
+        # gets a different distance threshold.
+        if cls_id == 0:
+            critical_area = DUCK_ZONE_CRITICAL_AREA
+            danger_area   = DUCK_ZONE_DANGER_AREA
+        else:
+            critical_area = TRUCK_ZONE_CRITICAL_AREA
+            danger_area   = TRUCK_ZONE_DANGER_AREA
+
+        if area_frac >= critical_area:
             self.proximity_zone = "CRITICAL"
-        elif area_frac >= ZONE_DANGER_AREA:
+        elif area_frac >= danger_area:
             self.proximity_zone = "DANGER"
         else:
             self.proximity_zone = "FAR"
@@ -121,7 +138,6 @@ class ObjectThreatDetector:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-
     def evaluate(
         self,
         frame_shape: Tuple[int, int, int],
@@ -149,35 +165,57 @@ class ObjectThreatDetector:
             cy_bottom = y2 / h
             label     = CLASS_NAMES.get(cls_id, str(cls_id))
 
-            # ── size gate ────────────────────────────────────────────────────
-            if area_frac < MIN_AREA_FRACTION:
+            # Pick all gates from the object's class.  Never reuse a truck
+            # threshold for a duck, or vice versa.
+            if cls_id == 0:
+                min_confidence = DUCK_MIN_CONFIDENCE
+                min_area        = DUCK_MIN_AREA_FRACTION
+                lower_zone      = DUCK_LOWER_ZONE
+                corridor_hw     = DUCK_FRONTAL_CORRIDOR_HW
+            else:
+                min_confidence = TRUCK_MIN_CONFIDENCE
+                min_area        = TRUCK_MIN_AREA_FRACTION
+                lower_zone      = TRUCK_LOWER_ZONE
+                corridor_hw     = TRUCK_FRONTAL_CORRIDOR_HW
+
+            # ── confidence gate ───────────────────────────────────────────────
+            if score < min_confidence:
                 if verbose:
                     print(
                         f"[OBJ_DETECT] {label} score={score:.2f} "
-                        f"area={area_frac:.4f} < {MIN_AREA_FRACTION} → too small, ignored"
+                        f"< {min_confidence:.2f} → low confidence, ignored"
+                    )
+                continue
+
+            # ── size gate ────────────────────────────────────────────────────
+            if area_frac < min_area:
+                if verbose:
+                    print(
+                        f"[OBJ_DETECT] {label} score={score:.2f} "
+                        f"area={area_frac:.4f} < {min_area:.4f} → too small, ignored"
                     )
                 continue
 
             # ── vertical gate ─────────────────────────────────────────────────
-            lower_zone = LOWER_ZONE_DUCK if cls_id == 0 else LOWER_ZONE_TRUCK
             if cy_bottom < lower_zone:
                 if verbose:
                     print(
                         f"[OBJ_DETECT] {label} score={score:.2f} "
-                        f"cy_bottom={cy_bottom:.2f} < {lower_zone} → not in lower zone, ignored"
+                        f"cy_bottom={cy_bottom:.2f} < {lower_zone:.2f} "
+                        f"→ not close enough, ignored"
                     )
                 continue
 
             # ── horizontal corridor gate ──────────────────────────────────────
             # Uses a dead-band around centre to classify side cleanly.
             deviation = abs(cx_norm - 0.5)
-            if deviation > FRONTAL_CORRIDOR_HW:
+            if deviation > corridor_hw:
                 side_str = "left" if cx_norm < 0.5 else "right"
                 if verbose:
                     print(
                         f"[OBJ_DETECT] {label} score={score:.2f} "
                         f"cx={cx_norm:.2f} deviation={deviation:.2f} "
-                        f"→ out of corridor ({side_str}), ignored"
+                        f"> {corridor_hw:.2f} → out of corridor ({side_str}), ignored"
                     )
                 continue
 
