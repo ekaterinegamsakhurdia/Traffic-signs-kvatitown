@@ -2,7 +2,7 @@ baseline: 0.1
 radius: 0.0318
 k: 27.0
 gain: 1.0
-# trim: 0.074 
+# trim: 0.0745
 # for bart
 power_limit: 1
 v_max: 0.5

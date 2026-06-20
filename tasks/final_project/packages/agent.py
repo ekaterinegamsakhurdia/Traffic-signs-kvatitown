@@ -32,8 +32,8 @@ class FinalProjectAgent:
         # Configurable detection thresholds — set higher values in
         # final_project_config.yaml on the physical robot so the robot
         # gets closer before reacting. Simulation uses the defaults.
-        self.red_line_threshold = cfg.get('red_line_ratio_threshold', 0.025)
-        self.red_line_roi_y     = cfg.get('red_line_roi_y_start',     0.58)
+        self.red_line_threshold = cfg.get('red_line_ratio_threshold', 0.09)
+        self.red_line_roi_y     = cfg.get('red_line_roi_y_start',     0.6)
 
         _min_area   = cfg.get('min_object_area_fraction', 0.0005)
         _lower_gate = cfg.get('frontal_lower_gate',       0.4)
