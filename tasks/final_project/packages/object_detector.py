@@ -26,11 +26,11 @@ DUCK_ZONE_DANGER_AREA    = 0.012
 # Increase MIN_AREA / LOWER_ZONE / MIN_CONFIDENCE to make truck detection
 # even stricter.  Decrease them if the robot begins missing a real truck.
 
-TRUCK_MIN_CONFIDENCE      = 0.60
+TRUCK_MIN_CONFIDENCE      = 0.70
 TRUCK_MIN_AREA_FRACTION   = 0.015
 TRUCK_FRONTAL_CORRIDOR_HW = 0.40
-TRUCK_LOWER_ZONE          = 0.50
-TRUCK_ZONE_CRITICAL_AREA  = 0.060
+TRUCK_LOWER_ZONE          = 0.60
+TRUCK_ZONE_CRITICAL_AREA  = 0.070
 TRUCK_ZONE_DANGER_AREA    = 0.025
 
 # Motion tracking: how many frames of cx/area history to keep per vehicle.

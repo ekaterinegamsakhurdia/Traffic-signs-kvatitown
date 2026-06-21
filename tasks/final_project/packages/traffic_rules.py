@@ -49,7 +49,7 @@ PRE_TURN_FRAMES = {
  
 TURN_DURATION = {
     "left":     0.2,
-    "right":    0.2,
+    "right":    0.25,
     "straight": 1.0,
 }
 
