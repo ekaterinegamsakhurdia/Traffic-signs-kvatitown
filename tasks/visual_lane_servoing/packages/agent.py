@@ -17,15 +17,7 @@ _ROI_START = 0.50
 _SLICE_TOL = 6
 
 # More slices = more stable on curves.
-# Ordered far -> near (low ratio = far ahead, high ratio = close to the robot).
 _SLICE_Y_RATIOS = [0.56, 0.64, 0.72, 0.80, 0.88]
-
-# Only slices at/above this ratio are used for the steering error. The far
-# slices show the road curving before the robot's own position has actually
-# moved off-center (perspective), which previously made the controller start
-# turning too early and clip the white line going into a curve. The far
-# slices are still used for curve anticipation (see detect_curve below).
-_NEAR_RATIO_CUTOFF = 0.70
 
 
 def _strip_center_x(mask: np.ndarray, y: int, white_x = None, prefer_right: bool = False, ):
@@ -120,7 +112,7 @@ def _strip_center_x(mask: np.ndarray, y: int, white_x = None, prefer_right: bool
     
         
     if white_x is not None:
-        DIST_THRESH = 200  # todo tune
+        DIST_THRESH = 200  
 
         filtered = [
             c for c in candidates
@@ -130,7 +122,7 @@ def _strip_center_x(mask: np.ndarray, y: int, white_x = None, prefer_right: bool
         if len(filtered) > 0:
             candidates = filtered
 
-    # todo yviteli borbali
+    # yviteli borbali
     # tetrze marjvniv ar iyos
     best = max(candidates, key=lambda c: np.median(c))
 
@@ -149,10 +141,8 @@ def detect_lines_in_slices(
     mask_white: np.ndarray,
     h: int,
 ) -> Tuple[list, list]:
-    """Returns (ratio, x) pairs for each detected line, one per slice that
-    found something, ordered far -> near (matching _SLICE_Y_RATIOS)."""
-    yellow_pts = []
-    white_pts = []
+    yellow_xs = []
+    white_xs = []
 
     for ratio in _SLICE_Y_RATIOS:
         y = int(h * ratio)
@@ -162,12 +152,12 @@ def detect_lines_in_slices(
         
 
         if yellow_x is not None:
-            yellow_pts.append((ratio, yellow_x))
+            yellow_xs.append(yellow_x)
 
         if white_x is not None:
-            white_pts.append((ratio, white_x))
+            white_xs.append(white_x)
 
-    return yellow_pts, white_pts
+    return yellow_xs, white_xs
 
 
 class LaneServoingAgent:
@@ -190,20 +180,8 @@ class LaneServoingAgent:
         self.steering_threshold = cfg.get("steering_threshold", 0.2)
         self.curve_boost = cfg.get("curve_boost", 1.0)
         self.detection_threshold = cfg.get("detection_threshold", 80)
-        self.trim = cfg.get("trim", 0.0)
         
         self._white_lane = []
-        
-# base_speed: 0.30
-# curve_boost: 1.0
-# curve_speed: 0.1
-# curve_threshold: 350
-# d_gain: 0.11   #heading gain
-# detection_threshold: 80
-# max_steer: 0.22
-# p_gain: 0.20    #lateral gain  franky - 0.18, 0.24 gladius (needs diff right checkpath frames)
-# steering_threshold: 0.2
-# trim: 0.0       #wheel asymmetry compensation, positive boosts the right wheel
 
 
         self.frame_count = 0
@@ -253,7 +231,7 @@ class LaneServoingAgent:
 
         return float(np.clip(error / (w / 2.0), -1.0, 1.0))
 
-    def _calculate_steering(self, error: float, is_curve: bool = False) -> float:
+    def _calculate_steering(self, error: float) -> float:
         raw_diff = error - self._prev_error
         error_diff = 0.70 * self._prev_diff + 0.30 * raw_diff
 
@@ -264,9 +242,7 @@ class LaneServoingAgent:
         raw_steering = float(np.clip(raw_steering, -self.max_steer, self.max_steer))
 
         # Smooth steering to prevent sudden hard turns when white/yellow line flickers.
-        # Once a curve is confirmed (via the far look-ahead slices), allow a
-        # faster response so the now-later steering can still catch up in time.
-        max_delta = 0.035 * (self.curve_boost if is_curve else 1.0)
+        max_delta = 0.035
         delta = np.clip(raw_steering - self._filtered_steering, -max_delta, max_delta)
 
         self._filtered_steering += delta
@@ -288,12 +264,8 @@ class LaneServoingAgent:
         # Slow down when steering is large.
         speed *= max(0.65, 1.0 - abs(steering) * 1.8)
 
-        # Trim compensates for a structurally weaker wheel: positive trim
-        # reduces the left wheel's share of speed and boosts the right
-        # wheel's, so a mechanically weaker right wheel ends up moving at
-        # the same actual speed as the left for steering == 0.
-        left = speed * (1.0 - self.trim) - steering
-        right = speed * (1.0 + self.trim) + steering
+        left = speed - steering
+        right = speed + steering
 
         return float(np.clip(left, 0.0, 0.35)), float(np.clip(right, 0.0, 0.35))
 
@@ -346,31 +318,26 @@ class LaneServoingAgent:
 
         h, w = mask_y.shape
         
-        yellow_pts, white_pts = detect_lines_in_slices(mask_y, mask_w, h)
+        yellow_xs, white_xs = detect_lines_in_slices(mask_y, mask_w, h)
 
-        # Full look-ahead set: kept for visualization and curve anticipation.
-        yellow_xs = [x for _, x in yellow_pts]
-        white_xs = [x for _, x in white_pts]
-
-        # Near-only set: drives the steering error so the controller reacts
-        # to where the robot actually is, not to curve shape still ahead of it.
-        yellow_xs_near = [x for r, x in yellow_pts if r >= _NEAR_RATIO_CUTOFF]
-        white_xs_near = [x for r, x in white_pts if r >= _NEAR_RATIO_CUTOFF]
-
-        left_det = len(yellow_xs_near) > 0
-        right_det = len(white_xs_near) > 0
+      
+            
+            
+        
+        left_det = len(yellow_xs) > 0
+        right_det = len(white_xs) > 0
 
         recovery = total_pixels < self.detection_threshold
         both_visible = left_det and right_det and not recovery
 
         is_curve, curve_dir = detect_curve(yellow_xs, white_xs, self.curve_threshold)
 
-        raw_error = self._calculate_error(yellow_xs_near, white_xs_near, left_det, right_det, w)
+        raw_error = self._calculate_error(yellow_xs, white_xs, left_det, right_det, w)
 
         # Stronger filtering. Prevents jumping when mask flickers.
         self._filtered_error = 0.82 * self._filtered_error + 0.18 * raw_error
 
-        steering = self._calculate_steering(self._filtered_error, is_curve)
+        steering = self._calculate_steering(self._filtered_error)
 
         left, right = self._motor_commands(steering, recovery, is_curve, both_visible)
         left, right = self._smooth(left, right, both_visible)
@@ -386,9 +353,8 @@ class LaneServoingAgent:
         if self.frame_count % 20 == 0:
             print(
                 f"[LaneServoingAgent] yellow_xs={yellow_xs}, white_xs={white_xs}, "
-                f"near_y={yellow_xs_near}, near_w={white_xs_near}, "
                 f"err={self._filtered_error:.3f}, steer={steering:.3f}, "
-                f"left={left:.3f}, right={right:.3f}, lane={not recovery}, curve={is_curve}"
+                f"left={left:.3f}, right={right:.3f}, lane={not recovery}"
             )
             
             
@@ -420,11 +386,3 @@ class LaneServoingAgent:
             "lane_detected": False,
             "frame_count": 0,
         }
-
-
-
-
-
-
-
-

@@ -31,8 +31,8 @@ TAG_NAMES = {
 DRIVE_SPEED = 0.4
 CREEP_SPEED = 0.05
  
-TURN_RIGHT  = (1, -0.4)
-TURN_LEFT = (-0.4, 1)
+TURN_RIGHT  = (0.9, 0.1)
+TURN_LEFT = (0.1, 0.9)
  
 PEEK_L = (-0.02, 0.5)
 PEEK_R = (0.5, -0.02)
@@ -41,15 +41,15 @@ PEEK_SETTLE_S = 0.35
 CROSS_LINE_S = 0
  
 PRE_TURN_FRAMES = {
-    "left":     22,  
-    "right":    15,  
+    "left":     15,  
+    "right":    10,  
     "straight": 10,
 }
  
  
 TURN_DURATION = {
-    "left":     0.2,
-    "right":    0.25,
+    "left":     0.9,
+    "right":    0.55,
     "straight": 1.0,
 }
 
@@ -77,15 +77,15 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
 
 PEEK_FRAMES_L1 = 5    # frames rotating left
 PEEK_HOLD_1_S  = 2  # hold & scan LEFT
-PEEK_FRAMES_R  = 8    # frames rotating right
+PEEK_FRAMES_R  = 7    # frames rotating right
 PEEK_HOLD_2_S  = 2  # hold & scan RIGHT
-PEEK_FRAMES_L2 = 5    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
+PEEK_FRAMES_L2 = 6    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
  
  
 # ---------------------------------------------------------------------------
 # Misc timing constants
 # ---------------------------------------------------------------------------
-RED_LINE_COOLDOWN_S  = 7.0
+RED_LINE_COOLDOWN_S  = 10.0
 SIGN_MEMORY_S        = 7.0  # remember a tag seen shortly before the red line
 STOP_SIGN_WAIT_S     = 2.0
 YIELD_CREEP_S        = 3
