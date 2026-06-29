@@ -28,35 +28,58 @@ TAG_NAMES = {
     11: "LEFT_OR_RIGHT",
 }
  
+# DRIVE_SPEED = 0.35
+
+# V1
 DRIVE_SPEED = 0.4
+
 CREEP_SPEED = 0.05
  
-TURN_RIGHT  = (0.9, 0.1)
-TURN_LEFT = (0.1, 0.9)
+# TURN_RIGHT  = (0.9, 0.1)
+# TURN_LEFT = (0.2, 0.8)
  
+# -------------------------------ordis---------------------------------------------
+TURN_RIGHT  = (1, 0.1)
+TURN_LEFT = (0.2, 0.8)
+
 PEEK_L = (-0.02, 0.5)
 PEEK_R = (0.5, -0.02)
 PEEK_SETTLE_S = 0.35
  
 CROSS_LINE_S = 0
  
+# -------------------------------ordis---------------------------------------------
+# PRE_TURN_FRAMES = {
+#     "left":     22,  
+#     "right":    18,  
+#     "straight": 10,
+# }
+ 
+#   -------------------------------------V1------------------
 PRE_TURN_FRAMES = {
-    "left":     15,  
-    "right":    10,  
+    "left":     19,  
+    "right":    12,  
     "straight": 10,
 }
  
- 
+# -------------------------------ordis---------------------------------------------
 TURN_DURATION = {
-    "left":     0.9,
-    "right":    0.55,
+    "left":     1.2,
+    "right":    0.4,
     "straight": 1.0,
 }
 
+#   -------------------------------------V1------------------
+# TURN_DURATION = {
+#     "left":     1,
+#     "right":    0.5,
+#     "straight": 1.0,
+# }
+
 POST_TURN_FRAMES = {
-    "left":     8,
-    "right":    8,    
-    "straight": 5,
+    "left":     3,
+    "right":    3,    
+    "straight": 10,
 }
  
 OBSTACLE_CLEAR_FRAMES = 8
@@ -64,8 +87,6 @@ OBSTACLE_CLEAR_FRAMES = 8
 OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
     BehaviorState.LANE_FOLLOW,
     BehaviorState.CROSSROAD_STOP,
-    # BehaviorState.CROSSROAD_PEEK_LEFT,
-    # BehaviorState.CROSSROAD_PEEK_RIGHT,
     BehaviorState.CROSSROAD_WAIT_VEHICLE,
     BehaviorState.STOP_WAIT,
     BehaviorState.CROSSROAD_PRE_TURN,
@@ -74,36 +95,38 @@ OBSTACLE_INTERRUPTIBLE_STATES = frozenset({
 })
  
  
-
-PEEK_FRAMES_L1 = 5    # frames rotating left
+# -------------------------------ordis---------------------------------------------
+PEEK_FRAMES_L1 = 2    # frames rotating left
 PEEK_HOLD_1_S  = 2  # hold & scan LEFT
-PEEK_FRAMES_R  = 7    # frames rotating right
+PEEK_FRAMES_R  = 4    # frames rotating right
 PEEK_HOLD_2_S  = 2  # hold & scan RIGHT
-PEEK_FRAMES_L2 = 6    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
+PEEK_FRAMES_L2 = 2    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
  
+#  -------------------------------V1---------------------------------
+
+# PEEK_FRAMES_L1 = 5    # frames rotating left
+# PEEK_HOLD_1_S  = 2  # hold & scan LEFT
+# PEEK_FRAMES_R  = 5    # frames rotating right
+# PEEK_HOLD_2_S  = 2  # hold & scan RIGHT
+# PEEK_FRAMES_L2 = 5    # re-align frames  (L1=3 left, R=6 right, L2=3 left → net 0 ✓)
  
+
 # ---------------------------------------------------------------------------
 # Misc timing constants
 # ---------------------------------------------------------------------------
-RED_LINE_COOLDOWN_S  = 10.0
+
+RED_LINE_COOLDOWN_S  = 15.0
 SIGN_MEMORY_S        = 7.0  # remember a tag seen shortly before the red line
 STOP_SIGN_WAIT_S     = 2.0
 YIELD_CREEP_S        = 3
 CROSSROAD_STOP_S     = 0.5
  
 # Area threshold for vehicle detection during peek / observation.
-# Slightly lower than the frontal-threat threshold (0.012) so partially-visible
-# side-approaching vehicles are still caught.
 # A vertical gate (cy_norm >= 0.25) separately filters horizon-level noise.
-PEEK_MIN_AREA_FRACTION = 0.0015  # 0.008 before
+PEEK_MIN_AREA_FRACTION = 0.0015 
 PEEK_MIN_CY_NORM = 0.15
-
-# Problem 5: require this many observations on a given side before treating it
-# as a confirmed vehicle detection.  Prevents single-frame YOLO glitches from
-# triggering a full yield sequence.
 PEEK_MIN_DETECTIONS_FOR_SIDE = 3
  
-# New simplified rule:
 #   1) Peek left/right.
 #   2) If a bot is seen, decide whether it moved during the peek samples.
 #   3) Moving bot  -> stop and wait until it disappears.
@@ -114,22 +137,13 @@ VEHICLE_MOVING_MIN_DAREA     = 0.003  # normalized bbox area change
 VEHICLE_MOVING_MIN_DBOTTOM   = 0.040  # normalized bbox bottom movement
 VEHICLE_MOVING_VOTES         = 2
 VEHICLE_GONE_CONFIRM_FRAMES  = 6
- 
- 
-# ---------------------------------------------------------------------------
-# Peek sub-state labels
-# ---------------------------------------------------------------------------
+
 PH_L1    = "L1"
 PH_HOLD1 = "HOLD1"
 PH_R     = "R"
 PH_HOLD2 = "HOLD2"
 PH_L2    = "L2"
 PH_DONE  = "DONE"
- 
- 
-# ---------------------------------------------------------------------------
-# Data classes
-# ---------------------------------------------------------------------------
  
 @dataclass
 class TrafficDecision:
@@ -143,7 +157,6 @@ class TrafficDecision:
  
 @dataclass
 class TrafficRuleManager:
-    # ── core state ───────────────────────────────────────────────────────────
     state:       BehaviorState = BehaviorState.LANE_FOLLOW
     state_until: float         = 0.0
     turn_until:  float         = 0.0
@@ -151,24 +164,16 @@ class TrafficRuleManager:
     active_tag_id: Optional[int] = None
     chosen_turn:   Optional[str] = None
  
-    # ── obstacle stop ─────────────────────────────────────────────────────────
     obstacle_clear_frames: int             = 0
     # State to return to once the duck/obstacle clears.  None means fall back
-    # to LANE_FOLLOW (safe default for interruptions during plain driving).
     resume_state:          Optional[BehaviorState] = None
  
-    # ── peek sub-state ────────────────────────────────────────────────────────
     peek_phase:       str   = PH_L1
     peek_frame_count: int   = 0
     peek_hold_until:  float = 0.0
     peek_sample_after: float = 0.0
-    # Each entry: (offset_from_centre, cx_side, scan_side)
-    # scan_side is "LEFT", "RIGHT", or "CENTRE" — which direction the robot
-    # was looking when it saw the vehicle.
     peek_vehicles:    list  = field(default_factory=list)
  
-    # ── vehicle observation/wait (CROSSROAD_WAIT_VEHICLE) ─────────────────────
-    # Simplified behavior:
     #   vehicle seen during peek -> classify as moving/stationary from bbox samples.
     #   moving vehicle -> wait here until it disappears from the triggering side.
     #   stationary vehicle -> proceed, unless it is also a frontal obstacle threat.
@@ -177,7 +182,6 @@ class TrafficRuleManager:
  
     waiting_vehicle_last_cx:   float         = 0.0  # cx_norm of the vehicle when wait began
     waiting_vehicle_last_area: float         = 0.0  # area_frac when wait began; used for moving-away check
-    # ── sign read at red-line approach ────────────────────────────────────────
  
     stop_completed:  bool          = False  # True once STOP_WAIT has been served for this intersection
     approach_tag_id: Optional[int] = None
@@ -189,20 +193,13 @@ class TrafficRuleManager:
     last_seen_tag_id: Optional[int] = None
     last_seen_tag_at: float         = 0.0
  
-    # ── yield creep timing ────────────────────────────────────────────────────
     yield_until: float = 0.0
  
-    # ── pre / post-turn straight-drive frame counters ─────────────────────────
     pre_turn_frames_done:  int = 0
     post_turn_frames_done: int = 0
  
-    # ── crossroad cooldown ────────────────────────────────────────────────────
     last_crossroad_at: float = 0.0
- 
-    # =========================================================================
-    # Main update — called every frame
-    # =========================================================================
- 
+
     def update(
         self,
         lane_left:     float,
@@ -228,8 +225,6 @@ class TrafficRuleManager:
                 f"(id={visible_tag_id})"
             )
  
-        # ── 0. DUCK / OBSTACLE STOP — absolute highest priority ───────────────
-        #
         # Design principles:
         #   • DUCK threats interrupt EVERY state with no exceptions — a duck in
         #     the path is always stopped, even mid-turn or mid-yield.
@@ -249,7 +244,6 @@ class TrafficRuleManager:
         vehicle_threats = [t for t in threats if getattr(t, 'is_vehicle', t.cls_id == 1)]
  
         # Vehicles only interrupt during plain lane follow — not during any
-        # crossroad state (those have their own vehicle-handling logic).
         _crossroad_states = frozenset({
             BehaviorState.CROSSROAD_STOP,
             BehaviorState.CROSSROAD_PEEK_LEFT,
@@ -397,8 +391,6 @@ class TrafficRuleManager:
  
         # ── 2. CROSSROAD_STOP — brief halt, improve tag reading ───────────────
         if self.state == BehaviorState.CROSSROAD_STOP:
-            # Only fill the saved sign if none was known at the red line.
-            # Never replace an already locked approach sign while peeking around.
             if self.approach_tag_id is None and visible_tag_id is not None:
                 self.approach_tag_id = visible_tag_id
                 self.peek_for_stop   = visible_tag_id in STOP_TAGS
@@ -610,14 +602,12 @@ class TrafficRuleManager:
                                    BehaviorState.YIELD_WAIT, "yield: creeping", tag_id)
  
         if tag_id in LEFT_RIGHT_TAGS:
-            # direction = random.choice(["left", "right"])
-            direction = random.choice(["right"])
+            direction = random.choice(["left", "right"])
             print(f"[CROSSROAD_GO] LEFT_OR_RIGHT → random choice: {direction}")
             return self._enter_crossroad_pre_turn(direction, now, tag_id)
  
         if tag_id in LEFT_FORWARD_TAGS:
-            # direction = random.choice(["left", "straight"])
-            direction = random.choice(["left"])
+            direction = random.choice(["left", "straight"])
             print(f"[CROSSROAD_GO] LEFT_OR_FORWARD → random choice: {direction}")
             return self._enter_crossroad_pre_turn(direction, now, tag_id)
  
@@ -647,10 +637,6 @@ class TrafficRuleManager:
                                BehaviorState.CROSSROAD_PRE_TURN,
                                f"crossing line before {direction}", tag_id, direction)
  
-    # =========================================================================
-    # Peek sub-state machine
-    # =========================================================================
- 
     def _reset_peek(self):
         self.peek_phase        = PH_L1
         self.peek_frame_count  = 0
@@ -678,10 +664,7 @@ class TrafficRuleManager:
             "RIGHT"  if self.peek_phase in (PH_R,  PH_HOLD2) else
             "CENTRE"
         )
- 
-        # Collect vehicle detections only while the robot is HOLDING still.
-        # Do NOT use rotating frames for movement classification: camera rotation
-        # moves the bbox even when the other bot is stationary.
+
         snap = self._vehicle_snapshot(frame_shape, detections)
         collecting_scan = self.peek_phase in (PH_HOLD1, PH_HOLD2)
         ready_to_sample = collecting_scan and now >= self.peek_sample_after
@@ -712,7 +695,6 @@ class TrafficRuleManager:
         else:
             print(f"[PEEK/{self.peek_phase}] no vehicle  scanning={scan_side}")
  
-        # If the red-line frame had no tag, restore the remembered approach sign.
         if (
             self.approach_tag_id is None
             and self.last_seen_tag_id is not None
@@ -726,7 +708,6 @@ class TrafficRuleManager:
                 f"(id={self.approach_tag_id})"
             )
  
-        # Log any tags visible during peek; only use one when no sign was saved.
         for tag in tags:
             tid   = int(tag.get("id", -1))
             tname = TAG_NAMES.get(tid, f"id={tid}")
@@ -817,7 +798,6 @@ class TrafficRuleManager:
                                        BehaviorState.CROSSROAD_PEEK_LEFT,
                                        "peek re-align")
  
-        # ── PH_DONE — simplified vehicle logic then transition ────────────────
         tag_name = TAG_NAMES.get(self.approach_tag_id, str(self.approach_tag_id))
  
         left_samples  = [v for v in self.peek_vehicles if v[3] == "LEFT"]
@@ -836,15 +816,6 @@ class TrafficRuleManager:
             f"approach_tag={tag_name} (id={self.approach_tag_id})"
         )
  
-        # New rule:
-        #   no bot -> go by sign
-        #   stationary bot -> go by sign unless object_detector has already
-        #                     stopped us as a frontal path blocker
-        #   moving bot -> wait until it disappears, then go by sign
-        # if left_moving or right_moving:
-
-        # Any confirmed truck during this full peek:
-        # restart the entire left → right peek instead of waiting.
         if left_seen or right_seen:
             seen_sides = []
 
@@ -859,8 +830,6 @@ class TrafficRuleManager:
                 f"restarting full peek instead of waiting"
             )
 
-            # Clears old samples and starts a new L → R observation cycle.
-            # approach_tag_id is NOT reset, so the remembered sign is preserved.
             self._reset_peek()
             self.state = BehaviorState.CROSSROAD_PEEK_LEFT
 
@@ -871,29 +840,6 @@ class TrafficRuleManager:
                 f"truck seen on {seen_sides}: re-peeking",
                 self.approach_tag_id,
             )
-
-        # if left_seen or right_seen:
-        #     side = "LEFT" if left_moving else "RIGHT"
-        #     print(
-        #         f"[PEEK] *** MOVING BOT SEEN ON {side} — stopping until it goes away ***"
-        #     )
-        #     self.state = BehaviorState.CROSSROAD_WAIT_VEHICLE
-        #     self.vehicle_clear_frames = 0
-        #     self.waiting_vehicle_side = side
-        #     self.active_tag_id = self.approach_tag_id
-        #     # Capture the vehicle's last known position from peek samples so   
-        #     # CROSSROAD_WAIT_VEHICLE can detect when it starts moving away.
-        #     _trigger_samples = left_samples if left_moving else right_samples
-        #     if _trigger_samples:
-        #         _lcx, _larea, _, _ = _trigger_samples[-1]
-        #         self.waiting_vehicle_last_cx   = _lcx
-        #         self.waiting_vehicle_last_area = _larea
-        #     else:
-        #         self.waiting_vehicle_last_cx   = 0.0
-        #         self.waiting_vehicle_last_area = 0.0
-        #     return TrafficDecision(0.0, 0.0, self.state,
-        #                            f"moving bot on {side}: waiting",
-        #                            self.approach_tag_id)
  
         if left_seen or right_seen:
             stationary_sides = []
@@ -909,10 +855,7 @@ class TrafficRuleManager:
  
         print(f"[PEEK] no vehicle seen — proceeding based on tag={tag_name}")
         return self._proceed_after_crossroad(now)
- 
-    # =========================================================================
-    # Helpers
-    # =========================================================================
+
  
     def _best_visible_tag(self, tags) -> Optional[int]:
         best_id, best_area = None, 0.0

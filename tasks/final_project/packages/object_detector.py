@@ -27,8 +27,9 @@ DUCK_ZONE_DANGER_AREA    = 0.012
 # even stricter.  Decrease them if the robot begins missing a real truck.
 
 TRUCK_MIN_CONFIDENCE      = 0.70
-TRUCK_MIN_AREA_FRACTION   = 0.015
-TRUCK_FRONTAL_CORRIDOR_HW = 0.40
+# TRUCK_MIN_AREA_FRACTION   = 0.012
+TRUCK_MIN_AREA_FRACTION   = 0.005
+TRUCK_FRONTAL_CORRIDOR_HW = 0.60
 TRUCK_LOWER_ZONE          = 0.60
 TRUCK_ZONE_CRITICAL_AREA  = 0.070
 TRUCK_ZONE_DANGER_AREA    = 0.025
@@ -39,7 +40,7 @@ VEHICLE_HISTORY_LEN = 6
 
 # Movement threshold: sum of |Δcx| + |Δarea| over the history window.
 # Below this the vehicle is declared stationary.
-VEHICLE_STATIONARY_THRESHOLD = 0.03
+VEHICLE_STATIONARY_THRESHOLD = 0.01
 
 CLASS_NAMES = {0: "DUCK", 1: "VEHICLE", 2: "SIGN"}
 
@@ -80,16 +81,13 @@ class ThreatObject:
         self.score         = score
         self.cx_norm       = cx_norm
         self.cy_norm       = cy_norm
-        self.bottom_norm   = cy_bottom   # alias used by traffic_rule_manager
+        self.bottom_norm   = cy_bottom   
         self.area_frac     = area_frac
         self.side          = side
         self.is_duck       = cls_id == 0
         self.is_vehicle    = cls_id == 1
         self.is_stationary = is_stationary
 
-        # Duck and truck proximity zones are intentionally independent.
-        # This lets traffic_rules.py use the same zone names while each class
-        # gets a different distance threshold.
         if cls_id == 0:
             critical_area = DUCK_ZONE_CRITICAL_AREA
             danger_area   = DUCK_ZONE_DANGER_AREA
@@ -135,9 +133,6 @@ class ObjectThreatDetector:
         # Bucket key = round(cx_norm, 1) so nearby detections share history.
         self._vehicle_history: Dict[str, deque] = {}
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
     def evaluate(
         self,
         frame_shape: Tuple[int, int, int],
@@ -165,8 +160,6 @@ class ObjectThreatDetector:
             cy_bottom = y2 / h
             label     = CLASS_NAMES.get(cls_id, str(cls_id))
 
-            # Pick all gates from the object's class.  Never reuse a truck
-            # threshold for a duck, or vice versa.
             if cls_id == 0:
                 min_confidence = DUCK_MIN_CONFIDENCE
                 min_area        = DUCK_MIN_AREA_FRACTION
